@@ -145,7 +145,7 @@ Generate exactly {num_slides} slides."""
     return json.loads(text)
 
 # ── PPTX Generation ───────────────────────────────────────────
-def create_pptx(slides, colors, client_name, company_name, pres_type, tone, logo_path=None):
+def create_pptx(slides, colors, client_name, company_name, pres_type, tone, logo_path=None, font_style='aptos'):
     """Generate PPTX using Node.js pptxgenjs"""
     output_id = str(uuid.uuid4())[:8]
     output_path = str(OUTPUT_DIR / f"proposal_{output_id}.pptx")
@@ -158,7 +158,8 @@ def create_pptx(slides, colors, client_name, company_name, pres_type, tone, logo
         "tone": tone,
         "slides": slides,
         "colors": colors,
-        "logoPath": str(logo_path) if logo_path else None
+        "logoPath": str(logo_path) if logo_path else None,
+        "fontStyle": font_style
     }
     
     script_path = Path(__file__).parent / "generate_pptx.js"
@@ -196,6 +197,7 @@ def generate():
         company_name = request.form.get('company_name', '').strip()
         pres_type = request.form.get('presentation_type', 'Corporate Proposal')
         tone = request.form.get('tone', 'Corporate')
+        font_style = request.form.get('font_style', 'aptos')
         key_points = request.form.get('key_points', '').strip()
         num_slides = int(request.form.get('num_slides', 12))
         num_slides = max(6, min(16, num_slides))
@@ -220,7 +222,7 @@ def generate():
         slides = generate_slide_content(client_name, company_name, pres_type, tone, key_points, num_slides)
         
         # Generate PPTX
-        output_path = create_pptx(slides, colors, client_name, company_name, pres_type, tone, logo_path)
+        output_path = create_pptx(slides, colors, client_name, company_name, pres_type, tone, logo_path, font_style)
         
         filename = f"{client_name.replace(' ', '_')}_{pres_type.replace(' ', '_')}.pptx"
         return jsonify({
@@ -288,8 +290,8 @@ select{cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%
 background-repeat:no-repeat;background-position:right 12px center}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:600px){.row{grid-template-columns:1fr}}
-.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
-@media(max-width:600px){.row3{grid-template-columns:1fr}}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px}
+@media(max-width:600px){.row3{grid-template-columns:1fr 1fr}}
 .btn{padding:14px 28px;border-radius:10px;font-family:var(--font);font-size:15px;font-weight:600;
 cursor:pointer;border:none;transition:all 0.2s}
 .btn-primary{background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:white;width:100%}
@@ -352,6 +354,15 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <option>Minimal</option>
 <option>Bold</option>
 <option>Friendly</option>
+</select></div>
+<div><label>Font Style</label>
+<select id="fontStyle">
+<option value="aptos">Aptos · Clean Modern</option>
+<option value="georgia">Georgia + Calibri · Classic</option>
+<option value="arial">Arial Black + Arial · Bold</option>
+<option value="trebuchet">Trebuchet + Calibri · Creative</option>
+<option value="palatino">Palatino + Garamond · Elegant</option>
+<option value="cambria">Cambria + Calibri · Traditional</option>
 </select></div>
 <div><label>Number of Slides</label>
 <select id="numSlides">
@@ -488,6 +499,7 @@ async function generate() {
   const companyName = document.getElementById('companyName').value.trim();
   const presType = document.getElementById('presType').value;
   const tone = document.getElementById('tone').value;
+  const fontStyle = document.getElementById('fontStyle').value;
   const keyPoints = document.getElementById('keyPoints').value.trim();
   const numSlides = document.getElementById('numSlides').value;
   
@@ -504,6 +516,7 @@ async function generate() {
   formData.append('company_name', companyName);
   formData.append('presentation_type', presType);
   formData.append('tone', tone);
+  formData.append('font_style', fontStyle);
   formData.append('key_points', keyPoints);
   formData.append('num_slides', numSlides);
   

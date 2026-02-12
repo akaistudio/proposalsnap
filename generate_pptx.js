@@ -21,8 +21,21 @@ process.stdin.on("end", async () => {
 async function generatePresentation(data) {
   const {
     outputPath, clientName, companyName, presentationType,
-    tone, slides, colors, logoPath
+    tone, slides, colors, logoPath, fontStyle
   } = data;
+
+  // Font mapping
+  const fontMap = {
+    aptos: { header: "Aptos", body: "Aptos" },
+    georgia: { header: "Georgia", body: "Calibri" },
+    arial: { header: "Arial Black", body: "Arial" },
+    trebuchet: { header: "Trebuchet MS", body: "Calibri" },
+    palatino: { header: "Palatino", body: "Garamond" },
+    cambria: { header: "Cambria", body: "Calibri" }
+  };
+  const fonts = fontMap[fontStyle] || fontMap.aptos;
+  const hFont = fonts.header;
+  const bFont = fonts.body;
 
   const primary = colors.primary || "1E2761";
   const secondary = colors.secondary || "CADCFC";
@@ -60,11 +73,11 @@ async function generatePresentation(data) {
     });
     slide.addText(companyName || "", {
       x: 0.5, y: 5.1, w: 4, h: 0.525, fontSize: 9,
-      color: textMuted, fontFace: "Calibri", valign: "middle", margin: 0
+      color: textMuted, fontFace: bFont, valign: "middle", margin: 0
     });
     slide.addText(`${pageNum} / ${total}`, {
       x: 8, y: 5.1, w: 1.5, h: 0.525, fontSize: 9,
-      color: textMuted, fontFace: "Calibri", align: "right", valign: "middle", margin: 0
+      color: textMuted, fontFace: bFont, align: "right", valign: "middle", margin: 0
     });
   }
 
@@ -86,19 +99,19 @@ async function generatePresentation(data) {
       addLogo(slide, 0.6, 0.5, 1.8);
 
       slide.addText(slideData.title || "", {
-        x: 0.6, y: 1.6, w: 8.8, h: 1.4, fontSize: 40, fontFace: "Georgia",
+        x: 0.6, y: 1.6, w: 8.8, h: 1.4, fontSize: 40, fontFace: hFont,
         color: textLight, bold: true, margin: 0
       });
 
       slide.addText(slideData.subtitle || "", {
-        x: 0.6, y: 3.0, w: 8.8, h: 0.6, fontSize: 18, fontFace: "Calibri",
+        x: 0.6, y: 3.0, w: 8.8, h: 0.6, fontSize: 18, fontFace: bFont,
         color: secondary, margin: 0
       });
 
       // Client + Date
       const dateStr = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
       slide.addText(`Prepared for ${clientName || "Client"} · ${dateStr}`, {
-        x: 0.6, y: 3.8, w: 8.8, h: 0.5, fontSize: 12, fontFace: "Calibri",
+        x: 0.6, y: 3.8, w: 8.8, h: 0.5, fontSize: 12, fontFace: bFont,
         color: textMuted, margin: 0
       });
 
@@ -112,7 +125,7 @@ async function generatePresentation(data) {
       slide.background = { color: light };
       
       slide.addText(slideData.title || "Agenda", {
-        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 32, fontFace: "Georgia",
+        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 32, fontFace: hFont,
         color: textDark, bold: true, margin: 0
       });
 
@@ -124,11 +137,11 @@ async function generatePresentation(data) {
           x: 0.6, y: yPos, w: 0.45, h: 0.45, fill: { color: accent }
         });
         slide.addText(`${i + 1}`, {
-          x: 0.6, y: yPos, w: 0.45, h: 0.45, fontSize: 14, fontFace: "Calibri",
+          x: 0.6, y: yPos, w: 0.45, h: 0.45, fontSize: 14, fontFace: bFont,
           color: textLight, bold: true, align: "center", valign: "middle", margin: 0
         });
         slide.addText(item, {
-          x: 1.25, y: yPos, w: 8, h: 0.45, fontSize: 16, fontFace: "Calibri",
+          x: 1.25, y: yPos, w: 8, h: 0.45, fontSize: 16, fontFace: bFont,
           color: textDark, valign: "middle", margin: 0
         });
       });
@@ -140,7 +153,7 @@ async function generatePresentation(data) {
       slide.background = { color: light };
 
       slide.addText(slideData.title || "", {
-        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: "Georgia",
+        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: hFont,
         color: textDark, bold: true, margin: 0
       });
 
@@ -151,12 +164,12 @@ async function generatePresentation(data) {
       });
       
       const leftBullets = (slideData.left_bullets || []).map((b, i, arr) => ({
-        text: b, options: { bullet: true, fontSize: 13, fontFace: "Calibri", color: textDark,
+        text: b, options: { bullet: true, fontSize: 13, fontFace: bFont, color: textDark,
           breakLine: i < arr.length - 1, paraSpaceAfter: 6 }
       }));
       if (leftBullets.length) {
         slide.addText(slideData.left_title || "", {
-          x: 0.75, y: 1.45, w: 3.8, h: 0.45, fontSize: 16, fontFace: "Georgia",
+          x: 0.75, y: 1.45, w: 3.8, h: 0.45, fontSize: 16, fontFace: hFont,
           color: primary, bold: true, margin: 0
         });
         slide.addText(leftBullets, {
@@ -171,12 +184,12 @@ async function generatePresentation(data) {
       });
 
       const rightBullets = (slideData.right_bullets || []).map((b, i, arr) => ({
-        text: b, options: { bullet: true, fontSize: 13, fontFace: "Calibri", color: textDark,
+        text: b, options: { bullet: true, fontSize: 13, fontFace: bFont, color: textDark,
           breakLine: i < arr.length - 1, paraSpaceAfter: 6 }
       }));
       if (rightBullets.length) {
         slide.addText(slideData.right_title || "", {
-          x: 5.45, y: 1.45, w: 3.8, h: 0.45, fontSize: 16, fontFace: "Georgia",
+          x: 5.45, y: 1.45, w: 3.8, h: 0.45, fontSize: 16, fontFace: hFont,
           color: primary, bold: true, margin: 0
         });
         slide.addText(rightBullets, {
@@ -191,7 +204,7 @@ async function generatePresentation(data) {
       slide.background = { color: dark };
 
       slide.addText(slideData.title || "", {
-        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: "Georgia",
+        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: hFont,
         color: textLight, bold: true, margin: 0
       });
 
@@ -206,16 +219,16 @@ async function generatePresentation(data) {
           fill: { color: primary, transparency: 30 }
         });
         slide.addText(stat.value || "", {
-          x: xPos, y: 1.7, w: cardW, h: 1.2, fontSize: 42, fontFace: "Georgia",
+          x: xPos, y: 1.7, w: cardW, h: 1.2, fontSize: 42, fontFace: hFont,
           color: accent, bold: true, align: "center", valign: "middle", margin: 0
         });
         slide.addText(stat.label || "", {
-          x: xPos, y: 2.9, w: cardW, h: 0.5, fontSize: 14, fontFace: "Calibri",
+          x: xPos, y: 2.9, w: cardW, h: 0.5, fontSize: 14, fontFace: bFont,
           color: secondary, align: "center", valign: "top", margin: 0
         });
         if (stat.description) {
           slide.addText(stat.description, {
-            x: xPos + 0.15, y: 3.4, w: cardW - 0.3, h: 0.7, fontSize: 11, fontFace: "Calibri",
+            x: xPos + 0.15, y: 3.4, w: cardW - 0.3, h: 0.7, fontSize: 11, fontFace: bFont,
             color: textMuted, align: "center", valign: "top", margin: 0
           });
         }
@@ -228,7 +241,7 @@ async function generatePresentation(data) {
       slide.background = { color: light };
 
       slide.addText(slideData.title || "", {
-        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: "Georgia",
+        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: hFont,
         color: textDark, bold: true, margin: 0
       });
 
@@ -250,23 +263,23 @@ async function generatePresentation(data) {
         });
         slide.addText(`${i + 1}`, {
           x: xPos + stepW / 2 - 0.22, y: 1.78, w: 0.44, h: 0.44,
-          fontSize: 14, fontFace: "Calibri", color: textLight, bold: true,
+          fontSize: 14, fontFace: bFont, color: textLight, bold: true,
           align: "center", valign: "middle", margin: 0
         });
         // Phase name
         slide.addText(step.phase || "", {
-          x: xPos, y: 2.4, w: stepW, h: 0.4, fontSize: 13, fontFace: "Georgia",
+          x: xPos, y: 2.4, w: stepW, h: 0.4, fontSize: 13, fontFace: hFont,
           color: primary, bold: true, align: "center", margin: 0
         });
         // Description
         slide.addText(step.description || "", {
-          x: xPos, y: 2.8, w: stepW, h: 1.2, fontSize: 11, fontFace: "Calibri",
+          x: xPos, y: 2.8, w: stepW, h: 1.2, fontSize: 11, fontFace: bFont,
           color: textDark, align: "center", valign: "top", margin: 0
         });
         // Duration
         if (step.duration) {
           slide.addText(step.duration, {
-            x: xPos, y: 4.0, w: stepW, h: 0.35, fontSize: 10, fontFace: "Calibri",
+            x: xPos, y: 4.0, w: stepW, h: 0.35, fontSize: 10, fontFace: bFont,
             color: accent, align: "center", italic: true, margin: 0
           });
         }
@@ -279,7 +292,7 @@ async function generatePresentation(data) {
       slide.background = { color: light };
 
       slide.addText(slideData.title || "Investment", {
-        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: "Georgia",
+        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: hFont,
         color: textDark, bold: true, margin: 0
       });
 
@@ -297,16 +310,16 @@ async function generatePresentation(data) {
         });
 
         slide.addText(tier.name || "", {
-          x: xPos, y: 1.35, w: tierW, h: 0.45, fontSize: 16, fontFace: "Georgia",
+          x: xPos, y: 1.35, w: tierW, h: 0.45, fontSize: 16, fontFace: hFont,
           color: isHighlight ? textLight : textDark, bold: true, align: "center", margin: 0
         });
         slide.addText(tier.price || "", {
-          x: xPos, y: 1.85, w: tierW, h: 0.55, fontSize: 28, fontFace: "Georgia",
+          x: xPos, y: 1.85, w: tierW, h: 0.55, fontSize: 28, fontFace: hFont,
           color: isHighlight ? accent : primary, bold: true, align: "center", margin: 0
         });
 
         const features = (tier.features || []).map((f, fi, arr) => ({
-          text: f, options: { bullet: true, fontSize: 11, fontFace: "Calibri",
+          text: f, options: { bullet: true, fontSize: 11, fontFace: bFont,
             color: isHighlight ? secondary : textDark,
             breakLine: fi < arr.length - 1, paraSpaceAfter: 4 }
         }));
@@ -324,7 +337,7 @@ async function generatePresentation(data) {
       slide.background = { color: light };
 
       slide.addText(slideData.title || "Our Team", {
-        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: "Georgia",
+        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: hFont,
         color: textDark, bold: true, margin: 0
       });
 
@@ -344,20 +357,20 @@ async function generatePresentation(data) {
         });
         slide.addText((m.name || "")[0] || "?", {
           x: xPos + memW / 2 - 0.4, y: 1.5, w: 0.8, h: 0.8,
-          fontSize: 24, fontFace: "Georgia", color: textLight, bold: true,
+          fontSize: 24, fontFace: hFont, color: textLight, bold: true,
           align: "center", valign: "middle", margin: 0
         });
 
         slide.addText(m.name || "", {
-          x: xPos, y: 2.45, w: memW, h: 0.35, fontSize: 14, fontFace: "Georgia",
+          x: xPos, y: 2.45, w: memW, h: 0.35, fontSize: 14, fontFace: hFont,
           color: textDark, bold: true, align: "center", margin: 0
         });
         slide.addText(m.role || "", {
-          x: xPos, y: 2.8, w: memW, h: 0.3, fontSize: 11, fontFace: "Calibri",
+          x: xPos, y: 2.8, w: memW, h: 0.3, fontSize: 11, fontFace: bFont,
           color: accent, align: "center", margin: 0
         });
         slide.addText(m.bio || "", {
-          x: xPos + 0.15, y: 3.15, w: memW - 0.3, h: 1.1, fontSize: 10, fontFace: "Calibri",
+          x: xPos + 0.15, y: 3.15, w: memW - 0.3, h: 1.1, fontSize: 10, fontFace: bFont,
           color: textMuted, align: "center", valign: "top", margin: 0
         });
       });
@@ -375,18 +388,18 @@ async function generatePresentation(data) {
       addLogo(slide, 4.1, 1.0, 1.8);
 
       slide.addText(slideData.title || "Thank You", {
-        x: 0.6, y: 2.2, w: 8.8, h: 1.0, fontSize: 38, fontFace: "Georgia",
+        x: 0.6, y: 2.2, w: 8.8, h: 1.0, fontSize: 38, fontFace: hFont,
         color: textLight, bold: true, align: "center", margin: 0
       });
 
       slide.addText(slideData.subtitle || "", {
-        x: 0.6, y: 3.2, w: 8.8, h: 0.5, fontSize: 16, fontFace: "Calibri",
+        x: 0.6, y: 3.2, w: 8.8, h: 0.5, fontSize: 16, fontFace: bFont,
         color: secondary, align: "center", margin: 0
       });
 
       if (slideData.contact) {
         slide.addText(slideData.contact, {
-          x: 0.6, y: 3.9, w: 8.8, h: 0.5, fontSize: 13, fontFace: "Calibri",
+          x: 0.6, y: 3.9, w: 8.8, h: 0.5, fontSize: 13, fontFace: bFont,
           color: textMuted, align: "center", margin: 0
         });
       }
@@ -400,13 +413,13 @@ async function generatePresentation(data) {
       slide.background = { color: light };
 
       slide.addText(slideData.title || "", {
-        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: "Georgia",
+        x: 0.6, y: 0.4, w: 8.8, h: 0.7, fontSize: 28, fontFace: hFont,
         color: textDark, bold: true, margin: 0
       });
 
       if (slideData.subtitle) {
         slide.addText(slideData.subtitle, {
-          x: 0.6, y: 1.1, w: 8.8, h: 0.4, fontSize: 14, fontFace: "Calibri",
+          x: 0.6, y: 1.1, w: 8.8, h: 0.4, fontSize: 14, fontFace: bFont,
           color: textMuted, margin: 0
         });
       }
@@ -424,7 +437,7 @@ async function generatePresentation(data) {
       });
 
       const bullets = (slideData.bullets || []).map((b, i, arr) => ({
-        text: b, options: { bullet: true, fontSize: 14, fontFace: "Calibri", color: textDark,
+        text: b, options: { bullet: true, fontSize: 14, fontFace: bFont, color: textDark,
           breakLine: i < arr.length - 1, paraSpaceAfter: 8 }
       }));
       
@@ -436,7 +449,7 @@ async function generatePresentation(data) {
       } else if (slideData.body) {
         slide.addText(slideData.body, {
           x: 0.85, y: slideData.subtitle ? 1.8 : 1.45, w: 8.4,
-          h: slideData.subtitle ? 2.7 : 3.05, fontSize: 14, fontFace: "Calibri",
+          h: slideData.subtitle ? 2.7 : 3.05, fontSize: 14, fontFace: bFont,
           color: textDark, valign: "top", margin: 0
         });
       }
