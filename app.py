@@ -162,8 +162,23 @@ def create_pptx(slides, colors, client_name, company_name, pres_type, tone, logo
     }
     
     script_path = Path(__file__).parent / "generate_pptx.js"
+    
+    # Find node binary
+    import shutil
+    node_bin = shutil.which("node")
+    if not node_bin:
+        # Try common paths
+        for p in ["/usr/bin/node", "/usr/local/bin/node", "/nix/store/*/bin/node"]:
+            import glob
+            matches = glob.glob(p)
+            if matches:
+                node_bin = matches[0]
+                break
+    if not node_bin:
+        node_bin = "node"
+    
     result = subprocess.run(
-        ["node", str(script_path)],
+        [node_bin, str(script_path)],
         input=json.dumps(input_data),
         capture_output=True, text=True, timeout=30
     )
