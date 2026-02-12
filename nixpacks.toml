@@ -1,0 +1,8 @@
+[phases.setup]
+nixPkgs = ["...", "nodejs_20"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt", "npm install"]
+
+[start]
+cmd = "gunicorn app:app --bind 0.0.0.0:${PORT:-5000} --timeout 120"
