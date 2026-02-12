@@ -19,4 +19,4 @@ RUN mkdir -p uploads outputs
 ENV PORT=5000
 EXPOSE 5000
 
-CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120"]
+CMD ["python", "start.py"]
