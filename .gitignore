@@ -1,0 +1,7 @@
+node_modules/
+__pycache__/
+uploads/
+outputs/
+*.pyc
+.env
+test_output.pptx
