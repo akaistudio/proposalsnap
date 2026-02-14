@@ -328,7 +328,7 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <div class="container">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
 <h1>ProposalSnap</h1>
-<a href="https://financesnap.up.railway.app" target="_blank" style="font-size:12px;color:#8B95B0;text-decoration:none;padding:6px 12px;border:1px solid #2A3148;border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">← SnapSuite</a>
+<a href="https://snapsuite.up.railway.app" target="_blank" style="font-size:12px;color:#8B95B0;text-decoration:none;padding:6px 12px;border:1px solid #2A3148;border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">← SnapSuite</a>
 </div>
 <p class="subtitle">AI-powered professional presentations in seconds</p>
 
