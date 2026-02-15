@@ -575,246 +575,723 @@ def demo():
     hub_url = os.environ.get('HUB_URL', 'https://snapsuite.up.railway.app')
     return render_template_string(DEMO_GALLERY_HTML, hub_url=hub_url)
 
-DEMO_GALLERY_HTML = '''<!DOCTYPE html>
+DEMO_GALLERY_HTML = r'''<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ProposalSnap — Demo Gallery</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0B0F1A;--surface:#141926;--border:#2A3148;--text:#E8ECF4;--text2:#8B95B0;--blue:#3B82F6;--green:#4ADE80;--red:#F87171;--orange:#FBBF24;--purple:#A78BFA;--teal:#2DD4BF}
-*{margin:0;padding:0;box-sizing:border-box}body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
-.topbar h1{font-size:20px;font-weight:800;color:#fff}.topbar h1 span{background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.topbar a{font-size:13px;color:var(--text2);text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:600}.topbar a:hover{background:var(--border)}
-.topbar .cta{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff}
-.main{max-width:1100px;margin:0 auto;padding:32px 24px}
-h2{font-size:28px;font-weight:900;color:#fff;margin-bottom:6px}
-.sub{font-size:15px;color:var(--text2);margin-bottom:32px}
-.proposal{background:var(--surface);border:1px solid var(--border);border-radius:16px;margin-bottom:28px;overflow:hidden}
-.proposal-header{padding:24px 28px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.proposal-header h3{font-size:20px;font-weight:800;color:#fff}
-.proposal-header .meta{text-align:right}
-.proposal-header .price{font-size:22px;font-weight:800;color:#fff}
-.status{display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700}
-.status.sent{background:rgba(59,130,246,.15);color:var(--blue)}
-.status.accepted{background:rgba(74,222,128,.15);color:var(--green)}
-.status.draft{background:rgba(139,149,176,.12);color:var(--text2)}
-.slides-container{padding:20px 28px;overflow-x:auto;display:flex;gap:16px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
-.slides-container::-webkit-scrollbar{height:6px}.slides-container::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.slide{min-width:280px;max-width:280px;aspect-ratio:16/9;border-radius:10px;padding:20px;display:flex;flex-direction:column;justify-content:center;position:relative;flex-shrink:0;border:1px solid rgba(255,255,255,.05)}
-.slide .slide-num{position:absolute;top:8px;right:10px;font-size:10px;color:rgba(255,255,255,.4);font-weight:700}
-.slide h4{font-size:14px;font-weight:800;line-height:1.3;margin-bottom:6px}
-.slide p{font-size:10px;line-height:1.5;opacity:.75}
-.slide .tag{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.15);display:inline-block;margin-top:6px;font-weight:600}
-.proposal-footer{padding:14px 28px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.proposal-footer span{font-size:12px;color:var(--text2)}
-.proposal-footer a{font-size:13px;color:var(--blue);text-decoration:none;font-weight:700}
+:root{--bg:#06080F;--surface:#0D1117;--card:#131920;--border:#1C2433;--border2:#2A3548;--text:#E2E8F0;--text2:#6B7A90;
+--blue:#3B82F6;--green:#4ADE80;--red:#F87171;--orange:#F59E0B;--purple:#A78BFA;--teal:#2DD4BF;--pink:#F472B6;--cyan:#22D3EE;--indigo:#818CF8}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 0%,rgba(59,130,246,.06) 0%,transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(167,139,250,.05) 0%,transparent 50%);pointer-events:none;z-index:0}
+
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:100;background:rgba(6,8,15,.85);backdrop-filter:blur(24px);border-bottom:1px solid var(--border);padding:14px 32px;display:flex;align-items:center;justify-content:space-between}
+.topbar h1{font-size:22px;font-weight:900;color:#fff;letter-spacing:-.5px}
+.topbar h1 span{background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar-right{display:flex;gap:8px}
+.topbar-right a{font-size:13px;color:var(--text2);text-decoration:none;padding:8px 16px;border-radius:8px;font-weight:600;transition:.2s}
+.topbar-right a:hover{color:#fff;background:rgba(255,255,255,.06)}
+.topbar-right .cta{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff;font-weight:700}
+
+/* Hero */
+.hero-section{padding:48px 32px 16px;max-width:1200px;margin:0 auto;position:relative;z-index:1}
+.hero-section h2{font-size:36px;font-weight:900;color:#fff;letter-spacing:-1.5px;margin-bottom:8px}
+.hero-section .sub{font-size:16px;color:var(--text2);line-height:1.6;max-width:600px}
+.hero-section .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.15);border-radius:50px;font-size:12px;font-weight:700;color:var(--blue);margin-bottom:16px}
+.hero-section .badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* Main */
+.main{max-width:1200px;margin:0 auto;padding:32px;position:relative;z-index:1}
+
+/* Proposal section */
+.proposal{margin-bottom:48px;position:relative}
+.proposal-label{font-family:'JetBrains Mono',monospace;font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:600;margin-bottom:12px}
+
+/* Proposal header card */
+.proposal-head{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:28px 32px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;position:relative;overflow:hidden}
+.proposal-head::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.proposal-head.theme-corporate::before{background:linear-gradient(90deg,#e94560,#c62a88,#0f3460)}
+.proposal-head.theme-wedding::before{background:linear-gradient(90deg,#f5c6a5,#c62a88,#801336)}
+.proposal-head.theme-workshop::before{background:linear-gradient(90deg,#64ffda,#3B82F6,#0a192f)}
+.ph-left h3{font-size:22px;font-weight:800;color:#fff;letter-spacing:-.5px;margin-bottom:6px}
+.ph-left .ph-meta{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ph-left .ph-meta .sep{color:var(--border2)}
+.ph-right{text-align:right}
+.ph-right .price{font-size:28px;font-weight:900;color:#fff;letter-spacing:-1px;margin-bottom:4px}
+.status{display:inline-flex;align-items:center;gap:4px;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.status.sent{background:rgba(59,130,246,.12);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+.status.accepted{background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.2)}
+.status.draft{background:rgba(107,122,144,.1);color:var(--text2);border:1px solid rgba(107,122,144,.15)}
+.status::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+
+/* Slides scroll */
+.slides-wrapper{position:relative}
+.slides-scroll{display:flex;gap:14px;overflow-x:auto;padding:8px 4px 20px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.slides-scroll::-webkit-scrollbar{display:none}
+.slides-scroll::after{content:'';min-width:20px;flex-shrink:0}
+
+/* Individual slide */
+.slide{min-width:300px;max-width:300px;aspect-ratio:16/9;border-radius:12px;flex-shrink:0;scroll-snap-align:start;position:relative;overflow:hidden;cursor:default;transition:transform .3s,box-shadow .3s;border:1px solid rgba(255,255,255,.06)}
+.slide:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 16px 48px rgba(0,0,0,.5)}
+.slide-inner{position:absolute;inset:0;padding:22px 24px;display:flex;flex-direction:column;z-index:2}
+.slide-num{position:absolute;top:10px;right:12px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;opacity:.35;z-index:3}
+
+/* Slide decorative elements */
+.slide-deco{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
+.slide-deco .circle{position:absolute;border-radius:50%;opacity:.08}
+.slide-deco .line{position:absolute;height:1px;opacity:.1}
+.slide-deco .corner{position:absolute;width:40px;height:40px;opacity:.12}
+.slide-deco .corner::before,.slide-deco .corner::after{content:'';position:absolute;background:currentColor}
+.slide-deco .corner.tl{top:12px;left:12px}.slide-deco .corner.tl::before{top:0;left:0;width:16px;height:1.5px}.slide-deco .corner.tl::after{top:0;left:0;width:1.5px;height:16px}
+.slide-deco .corner.br{bottom:12px;right:12px}.slide-deco .corner.br::before{bottom:0;right:0;width:16px;height:1.5px}.slide-deco .corner.br::after{bottom:0;right:0;width:1.5px;height:16px}
+.slide-deco .dots{position:absolute;display:grid;grid-template-columns:repeat(5,4px);gap:8px;opacity:.08}
+.slide-deco .dots span{width:4px;height:4px;border-radius:50%;background:currentColor}
+
+/* Slide title styles */
+.slide h4{font-family:'Playfair Display',serif;font-weight:800;line-height:1.2;margin-bottom:8px;position:relative}
+.slide .slide-label{font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:2px;opacity:.5;margin-bottom:auto}
+.slide p{font-size:11px;line-height:1.65;opacity:.8}
+.slide .tag{font-family:'JetBrains Mono',monospace;font-size:8px;padding:3px 8px;border-radius:4px;letter-spacing:1.5px;text-transform:uppercase;margin-top:auto;display:inline-block;width:fit-content}
+.slide .divider{width:32px;height:2px;margin:8px 0;border-radius:1px}
+.slide .icon-row{display:flex;gap:6px;margin-top:8px}
+.slide .icon-row span{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;background:rgba(255,255,255,.1)}
+
+/* Theme: Corporate Navy (Brand Identity) */
+.theme-corp{background:linear-gradient(145deg,#0a1628,#162240)}
+.theme-corp-alt{background:linear-gradient(145deg,#162240,#0f3460)}
+.theme-corp-accent{background:linear-gradient(145deg,#0f3460,#1a1a40)}
+.theme-corp-dark{background:linear-gradient(145deg,#0a0f1f,#0a1628)}
+.theme-corp h4{color:#e94560;font-size:16px}
+.theme-corp p,.theme-corp-alt p,.theme-corp-accent p,.theme-corp-dark p{color:#b8c5d6}
+.theme-corp .tag{background:rgba(233,69,96,.15);color:#e94560;border:1px solid rgba(233,69,96,.2)}
+.theme-corp .divider,.theme-corp-alt .divider,.theme-corp-accent .divider{background:#e94560}
+.theme-corp-alt h4,.theme-corp-accent h4,.theme-corp-dark h4{color:#e94560;font-size:16px}
+.theme-corp .slide-deco .circle,.theme-corp-alt .slide-deco .circle{background:#e94560}
+.theme-corp .slide-deco .line,.theme-corp-alt .slide-deco .line{background:#e94560}
+.theme-corp .slide-deco .corner,.theme-corp-alt .slide-deco .corner,.theme-corp-accent .slide-deco .corner{color:#e94560}
+.theme-corp .slide-deco .dots span,.theme-corp-alt .slide-deco .dots span{background:#e94560}
+
+/* Theme: Wedding (Burgundy/Gold) */
+.theme-wed{background:linear-gradient(145deg,#1f0a1a,#3d1132)}
+.theme-wed-alt{background:linear-gradient(145deg,#3d1132,#5c1a4a)}
+.theme-wed-accent{background:linear-gradient(145deg,#2a0e24,#1f0a1a)}
+.theme-wed h4,.theme-wed-alt h4,.theme-wed-accent h4{color:#f5c6a5;font-size:16px}
+.theme-wed p,.theme-wed-alt p,.theme-wed-accent p{color:#d4a9b8}
+.theme-wed .tag{background:rgba(245,198,165,.1);color:#f5c6a5;border:1px solid rgba(245,198,165,.2)}
+.theme-wed .divider,.theme-wed-alt .divider{background:linear-gradient(90deg,#f5c6a5,#c62a88)}
+.theme-wed .slide-deco .circle,.theme-wed-alt .slide-deco .circle{background:#c62a88}
+.theme-wed .slide-deco .corner,.theme-wed-alt .slide-deco .corner,.theme-wed-accent .slide-deco .corner{color:#f5c6a5}
+.theme-wed .slide-deco .dots span,.theme-wed-alt .slide-deco .dots span{background:#f5c6a5}
+
+/* Theme: Workshop (Teal/Mint) */
+.theme-wk{background:linear-gradient(145deg,#06111f,#0a192f)}
+.theme-wk-alt{background:linear-gradient(145deg,#0a192f,#112240)}
+.theme-wk-accent{background:linear-gradient(145deg,#112240,#0a192f)}
+.theme-wk h4,.theme-wk-alt h4,.theme-wk-accent h4{color:#64ffda;font-size:16px}
+.theme-wk p,.theme-wk-alt p,.theme-wk-accent p{color:#8892b0}
+.theme-wk .tag{background:rgba(100,255,218,.08);color:#64ffda;border:1px solid rgba(100,255,218,.15)}
+.theme-wk .divider,.theme-wk-alt .divider{background:#64ffda}
+.theme-wk .slide-deco .circle,.theme-wk-alt .slide-deco .circle{background:#64ffda}
+.theme-wk .slide-deco .corner,.theme-wk-alt .slide-deco .corner,.theme-wk-accent .slide-deco .corner{color:#64ffda}
+.theme-wk .slide-deco .dots span,.theme-wk-alt .slide-deco .dots span{background:#64ffda}
+
+/* Title slide special */
+.slide-title{justify-content:center;align-items:center;text-align:center}
+.slide-title h4{font-size:20px!important;margin-bottom:10px}
+.slide-title .company-from{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:1px;opacity:.5;margin-top:8px}
+
+/* End slide special */
+.slide-end{justify-content:center;align-items:center;text-align:center}
+.slide-end h4{font-size:18px!important}
+.slide-end .contact{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.5px;opacity:.6;margin-top:10px}
+
+/* Slide with metrics */
+.metric-row{display:flex;gap:12px;margin-top:10px}
+.metric{flex:1;text-align:center;padding:8px 4px;background:rgba(255,255,255,.04);border-radius:6px;border:1px solid rgba(255,255,255,.06)}
+.metric .mv{font-size:16px;font-weight:800;color:#fff}
+.metric .ml{font-size:8px;text-transform:uppercase;letter-spacing:1px;opacity:.5;margin-top:2px}
+
+/* Timeline visual */
+.timeline-row{display:flex;align-items:center;gap:0;margin-top:10px}
+.tl-step{flex:1;text-align:center;position:relative;padding-top:12px}
+.tl-step::before{content:'';position:absolute;top:4px;left:50%;width:8px;height:8px;border-radius:50%;transform:translateX(-50%)}
+.tl-step::after{content:'';position:absolute;top:7px;left:50%;width:100%;height:1.5px;opacity:.2}
+.tl-step:last-child::after{display:none}
+.tl-step span{font-size:8px;line-height:1.3;display:block;opacity:.6}
+
+/* Bullet list in slides */
+.slide-list{list-style:none;padding:0;margin:6px 0}
+.slide-list li{font-size:10px;padding:3px 0 3px 14px;position:relative;opacity:.75;line-height:1.5}
+.slide-list li::before{content:'';position:absolute;left:0;top:8px;width:5px;height:5px;border-radius:50%}
+
+/* Proposal footer */
+.proposal-foot{display:flex;justify-content:space-between;align-items:center;padding:14px 0;margin-top:4px}
+.proposal-foot .pf-tags{display:flex;gap:8px}
+.proposal-foot .pf-tag{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text2);background:var(--card);border:1px solid var(--border);padding:5px 12px;border-radius:6px;display:flex;align-items:center;gap:5px}
+.proposal-foot a{font-size:13px;color:var(--blue);text-decoration:none;font-weight:700;transition:.2s}
+.proposal-foot a:hover{color:#fff}
+
+/* Scroll hint */
+.scroll-hint{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin-bottom:8px}
+.scroll-hint .arrow{animation:nudge 2s infinite;display:inline-block}
+@keyframes nudge{0%,100%{transform:translateX(0)}50%{transform:translateX(6px)}}
+
+/* Responsive */
+@media(max-width:768px){
+    .topbar{padding:12px 16px}
+    .hero-section,.main{padding-left:16px;padding-right:16px}
+    .proposal-head{flex-direction:column;gap:16px;text-align:left}
+    .ph-right{text-align:left}
+    .slide{min-width:260px;max-width:260px}
+}
 </style>
 </head>
 <body>
+
 <div class="topbar">
     <h1>Proposal<span>Snap</span></h1>
-    <div style="display:flex;gap:8px">
+    <div class="topbar-right">
         <a href="{{ hub_url }}">← SnapSuite</a>
-        <a href="/" class="cta">+ Create New</a>
+        <a href="/" class="cta">+ Create New Proposal</a>
     </div>
 </div>
+
+<div class="hero-section">
+    <div class="badge"><span class="dot"></span> AI-Generated Proposals</div>
+    <h2>Sample Proposal Gallery</h2>
+    <p class="sub">Each of these professional pitch decks was generated by AI in under 30 seconds. Upload your logo, describe your project, and ProposalSnap handles the rest.</p>
+</div>
+
 <div class="main">
-    <h2>Sample Proposals</h2>
-    <p class="sub">AI-generated pitch decks created with ProposalSnap. Each was built in under 30 seconds.</p>
 
-    <!-- Proposal 1: Brand Identity -->
-    <div class="proposal">
-        <div class="proposal-header">
-            <div>
-                <h3>Brand Identity Package</h3>
-                <span style="font-size:13px;color:var(--text2)">Bloom Studio → Varnam Artboutique &nbsp;·&nbsp; Feb 10, 2026</span>
-            </div>
-            <div class="meta">
-                <div class="price">₹1,85,000</div>
-                <span class="status sent">Sent</span>
+<!-- ═══ PROPOSAL 1: Brand Identity ═══ -->
+<div class="proposal">
+    <div class="proposal-label" style="color:#e94560">● PROPOSAL 01</div>
+    <div class="proposal-head theme-corporate">
+        <div class="ph-left">
+            <h3>Brand Identity Package</h3>
+            <div class="ph-meta">
+                <span>Bloom Studio → Varnam Artboutique</span>
+                <span class="sep">·</span>
+                <span>Feb 10, 2026</span>
+                <span class="sep">·</span>
+                <span>12 slides</span>
             </div>
         </div>
-        <div class="slides-container">
-            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
-                <div class="slide-num">1</div>
-                <h4 style="color:#e94560">Brand Identity<br>Package</h4>
-                <p style="color:#eee">Prepared for Varnam Artboutique<br>by Bloom Studio</p>
-                <span class="tag">CORPORATE PROPOSAL</span>
+        <div class="ph-right">
+            <div class="price">₹1,85,000</div>
+            <span class="status sent">Sent</span>
+        </div>
+    </div>
+    <div class="scroll-hint"><span>Scroll slides</span> <span class="arrow">→</span></div>
+    <div class="slides-wrapper">
+        <div class="slides-scroll">
+            <!-- Slide 1: Title -->
+            <div class="slide theme-corp">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#e94560"></div>
+                    <div class="corner br" style="color:#e94560"></div>
+                    <div class="circle" style="width:200px;height:200px;right:-60px;bottom:-60px;background:#e94560"></div>
+                    <div class="line" style="width:60%;bottom:30%;left:20%;background:linear-gradient(90deg,transparent,#e94560,transparent)"></div>
+                </div>
+                <div class="slide-inner slide-title">
+                    <span class="tag">CORPORATE PROPOSAL</span>
+                    <h4 style="margin-top:12px">Brand Identity<br>Package</h4>
+                    <div class="divider" style="margin:8px auto"></div>
+                    <p style="font-size:12px;color:#eee">Prepared for <strong>Varnam Artboutique</strong></p>
+                    <span class="company-from">BY BLOOM STUDIO</span>
+                </div>
+                <div class="slide-num">01</div>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#16213e,#0f3460)">
-                <div class="slide-num">2</div>
-                <h4 style="color:#e94560">The Challenge</h4>
-                <p style="color:#ccc">Varnam Artboutique is expanding into international markets. Their current branding doesn't reflect their premium positioning or cultural heritage.</p>
+
+            <!-- Slide 2: The Challenge -->
+            <div class="slide theme-corp-alt">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#e94560"></div>
+                    <div class="dots" style="right:16px;bottom:16px;color:#e94560"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">THE CHALLENGE</span>
+                    <h4>Why Rebrand Now?</h4>
+                    <div class="divider"></div>
+                    <p>Varnam Artboutique is expanding into international markets. Current branding doesn't reflect their premium positioning or rich cultural heritage. Competitors are investing heavily in design.</p>
+                    <div class="metric-row">
+                        <div class="metric"><div class="mv" style="color:#e94560">73%</div><div class="ml">Need Update</div></div>
+                        <div class="metric"><div class="mv" style="color:#e94560">2.4×</div><div class="ml">Brand Recall</div></div>
+                    </div>
+                </div>
+                <div class="slide-num">02</div>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#0f3460,#16213e)">
-                <div class="slide-num">3</div>
-                <h4 style="color:#e94560">Our Approach</h4>
-                <p style="color:#ccc">Discovery & audit → Concept development → Design system → Brand guidelines → Collateral design → Handoff & training</p>
+
+            <!-- Slide 3: Our Approach -->
+            <div class="slide theme-corp-accent">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#e94560"></div>
+                    <div class="corner br" style="color:#e94560"></div>
+                    <div class="circle" style="width:120px;height:120px;left:-30px;top:-30px;background:#e94560"></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">OUR APPROACH</span>
+                    <h4>6-Phase Process</h4>
+                    <div class="divider"></div>
+                    <ul class="slide-list">
+                        <li style="--c:#e94560">Discovery &amp; Brand Audit</li>
+                        <li style="--c:#e94560">Concept Development</li>
+                        <li style="--c:#e94560">Visual Design System</li>
+                        <li style="--c:#e94560">Brand Guidelines</li>
+                        <li style="--c:#e94560">Collateral Design</li>
+                        <li style="--c:#e94560">Handoff &amp; Training</li>
+                    </ul>
+                </div>
+                <div class="slide-num">03</div>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#16213e,#1a1a2e)">
-                <div class="slide-num">4</div>
-                <h4 style="color:#e94560">Logo Redesign</h4>
-                <p style="color:#ccc">Modern mark blending Madhubani art motifs with clean contemporary typography. Primary, secondary, and icon variations.</p>
+
+            <!-- Slide 4: Logo -->
+            <div class="slide theme-corp">
+                <div class="slide-deco">
+                    <div class="dots" style="left:16px;top:16px;color:#e94560"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                    <div class="line" style="width:40%;top:50%;right:0;background:#e94560"></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">DELIVERABLE</span>
+                    <h4>Logo Redesign</h4>
+                    <div class="divider"></div>
+                    <p>Modern mark blending Madhubani art motifs with contemporary typography. Primary, secondary, and icon variations.</p>
+                    <div class="icon-row">
+                        <span>🎨</span><span>✏️</span><span>📐</span>
+                    </div>
+                </div>
+                <div class="slide-num">04</div>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#0f3460)">
-                <div class="slide-num">5</div>
-                <h4 style="color:#e94560">Color Palette</h4>
-                <p style="color:#ccc">Rich earth tones paired with vibrant accent colors inspired by traditional Indian textiles and natural dyes.</p>
+
+            <!-- Slide 5: Color Palette -->
+            <div class="slide theme-corp-alt">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#e94560"></div>
+                    <div class="circle" style="width:80px;height:80px;right:20px;top:20px;background:#c62a88;opacity:.12"></div>
+                    <div class="circle" style="width:60px;height:60px;right:60px;top:50px;background:#e94560;opacity:.1"></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">VISUAL SYSTEM</span>
+                    <h4>Color Palette</h4>
+                    <div class="divider"></div>
+                    <p>Rich earth tones paired with vibrant accents inspired by traditional Indian textiles and natural dyes.</p>
+                    <div style="display:flex;gap:6px;margin-top:10px">
+                        <div style="width:28px;height:28px;border-radius:6px;background:#e94560;border:2px solid rgba(255,255,255,.1)"></div>
+                        <div style="width:28px;height:28px;border-radius:6px;background:#c62a88;border:2px solid rgba(255,255,255,.1)"></div>
+                        <div style="width:28px;height:28px;border-radius:6px;background:#0f3460;border:2px solid rgba(255,255,255,.1)"></div>
+                        <div style="width:28px;height:28px;border-radius:6px;background:#f5c6a5;border:2px solid rgba(255,255,255,.1)"></div>
+                        <div style="width:28px;height:28px;border-radius:6px;background:#1a1a2e;border:2px solid rgba(255,255,255,.1)"></div>
+                    </div>
+                </div>
+                <div class="slide-num">05</div>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#0f3460,#1a1a2e)">
-                <div class="slide-num">6</div>
-                <h4 style="color:#e94560">Typography</h4>
-                <p style="color:#ccc">Primary: custom serif for headlines. Secondary: clean sans-serif for body. Hindi script: matching Devanagari family.</p>
+
+            <!-- Slide 6: Typography -->
+            <div class="slide theme-corp-accent">
+                <div class="slide-deco">
+                    <div class="corner br" style="color:#e94560"></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">VISUAL SYSTEM</span>
+                    <h4>Typography</h4>
+                    <div class="divider"></div>
+                    <div style="margin-top:4px">
+                        <div style="font-family:'Playfair Display',serif;font-size:18px;color:#fff;font-weight:700">Aa Heading</div>
+                        <div style="font-size:10px;opacity:.5;margin-bottom:6px">Playfair Display · Serif</div>
+                        <div style="font-family:'DM Sans',sans-serif;font-size:12px;color:#ccc">Aa Body text sample</div>
+                        <div style="font-size:10px;opacity:.5;margin-bottom:6px">DM Sans · Sans-serif</div>
+                        <div style="font-size:12px;color:#ccc">आ देवनागरी</div>
+                        <div style="font-size:10px;opacity:.5">Matching Hindi family</div>
+                    </div>
+                </div>
+                <div class="slide-num">06</div>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
-                <div class="slide-num">7</div>
-                <h4 style="color:#e94560">Collateral Design</h4>
-                <p style="color:#ccc">Business cards, letterhead, envelopes, packaging inserts, thank-you cards, exhibition banners, social media templates.</p>
+
+            <!-- Slide 7: Collateral -->
+            <div class="slide theme-corp">
+                <div class="slide-deco">
+                    <div class="dots" style="right:16px;top:16px;color:#e94560"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                    <div class="corner tl" style="color:#e94560"></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">DELIVERABLES</span>
+                    <h4>Collateral Design</h4>
+                    <div class="divider"></div>
+                    <ul class="slide-list">
+                        <li style="--c:#e94560">Business cards &amp; letterhead</li>
+                        <li style="--c:#e94560">Packaging inserts &amp; labels</li>
+                        <li style="--c:#e94560">Exhibition banners (3 sizes)</li>
+                        <li style="--c:#e94560">Social media templates</li>
+                        <li style="--c:#e94560">WhatsApp catalog design</li>
+                    </ul>
+                </div>
+                <div class="slide-num">07</div>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#16213e,#1a1a2e)">
-                <div class="slide-num">8</div>
-                <h4 style="color:#e94560">Digital Presence</h4>
-                <p style="color:#ccc">Website UI kit, email templates, Instagram grid layout, WhatsApp catalog design, and Google Business profile assets.</p>
+
+            <!-- Slide 8: Digital -->
+            <div class="slide theme-corp-alt">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#e94560"></div>
+                    <div class="corner br" style="color:#e94560"></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">DIGITAL</span>
+                    <h4>Online Presence</h4>
+                    <div class="divider"></div>
+                    <p>Website UI kit, email templates, Instagram grid layout, Google Business profile assets, and e-commerce product page templates.</p>
+                </div>
+                <div class="slide-num">08</div>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#0f3460)">
-                <div class="slide-num">9</div>
-                <h4 style="color:#e94560">Brand Guidelines</h4>
-                <p style="color:#ccc">60-page comprehensive guide covering logo usage, do's/don'ts, spacing rules, color specs (CMYK, RGB, Pantone), and voice & tone.</p>
+
+            <!-- Slide 9: Guidelines -->
+            <div class="slide theme-corp-accent">
+                <div class="slide-deco">
+                    <div class="circle" style="width:160px;height:160px;right:-40px;bottom:-40px;background:#e94560"></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">DELIVERABLE</span>
+                    <h4>Brand Guidelines</h4>
+                    <div class="divider"></div>
+                    <p>60-page comprehensive guide: logo usage, do's &amp; don'ts, spacing rules, color specs (CMYK, RGB, Pantone), voice &amp; tone.</p>
+                    <div class="metric-row">
+                        <div class="metric"><div class="mv" style="color:#e94560">60</div><div class="ml">Pages</div></div>
+                        <div class="metric"><div class="mv" style="color:#e94560">3</div><div class="ml">Formats</div></div>
+                    </div>
+                </div>
+                <div class="slide-num">09</div>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#0f3460,#16213e)">
+
+            <!-- Slide 10: Timeline -->
+            <div class="slide theme-corp">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#e94560"></div>
+                    <div class="line" style="width:80%;bottom:40px;left:10%;background:#e94560"></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">TIMELINE</span>
+                    <h4>10-Week Plan</h4>
+                    <div class="divider"></div>
+                    <div class="timeline-row">
+                        <div class="tl-step" style="--c:#e94560"><span>Wk 1-2<br><strong style="color:#e94560">Discovery</strong></span></div>
+                        <div class="tl-step" style="--c:#e94560"><span>Wk 3-4<br><strong style="color:#e94560">Concepts</strong></span></div>
+                        <div class="tl-step" style="--c:#e94560"><span>Wk 5-6<br><strong style="color:#e94560">Refine</strong></span></div>
+                        <div class="tl-step" style="--c:#e94560"><span>Wk 7-8<br><strong style="color:#e94560">Build</strong></span></div>
+                        <div class="tl-step" style="--c:#e94560"><span>Wk 9-10<br><strong style="color:#e94560">Handoff</strong></span></div>
+                    </div>
+                </div>
                 <div class="slide-num">10</div>
-                <h4 style="color:#e94560">Timeline</h4>
-                <p style="color:#ccc">Week 1-2: Discovery · Week 3-4: Concepts · Week 5-6: Refinement · Week 7-8: Collateral · Week 9-10: Guidelines & Handoff</p>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#16213e,#1a1a2e)">
+
+            <!-- Slide 11: Investment -->
+            <div class="slide theme-corp-alt">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#e94560"></div>
+                    <div class="corner br" style="color:#e94560"></div>
+                    <div class="dots" style="left:16px;bottom:16px;color:#e94560"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                </div>
+                <div class="slide-inner">
+                    <span class="slide-label">INVESTMENT</span>
+                    <h4>₹1,85,000</h4>
+                    <div class="divider"></div>
+                    <div class="metric-row">
+                        <div class="metric"><div class="mv" style="color:#e94560">50%</div><div class="ml">Upfront</div></div>
+                        <div class="metric"><div class="mv" style="color:#e94560">25%</div><div class="ml">Concepts</div></div>
+                        <div class="metric"><div class="mv" style="color:#e94560">25%</div><div class="ml">Delivery</div></div>
+                    </div>
+                    <p style="margin-top:8px;font-size:10px">Includes 3 revision rounds per phase</p>
+                </div>
                 <div class="slide-num">11</div>
-                <h4 style="color:#e94560">Investment</h4>
-                <p style="color:#ccc">Complete package: ₹1,85,000<br>50% upfront · 25% at concepts · 25% at delivery<br>Includes 3 revision rounds per phase.</p>
             </div>
-            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
+
+            <!-- Slide 12: Thank You -->
+            <div class="slide theme-corp-dark">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#e94560"></div>
+                    <div class="corner br" style="color:#e94560"></div>
+                    <div class="circle" style="width:240px;height:240px;left:50%;top:50%;transform:translate(-50%,-50%);background:#e94560;opacity:.04"></div>
+                </div>
+                <div class="slide-inner slide-end">
+                    <h4>Let's Create<br>Something Beautiful</h4>
+                    <div class="divider" style="margin:10px auto"></div>
+                    <span class="contact">hello@bloomstudio.in<br>+91 98765 43210</span>
+                    <span class="tag" style="margin-top:12px">BLOOM STUDIO</span>
+                </div>
                 <div class="slide-num">12</div>
-                <h4 style="color:#e94560">Let's Create<br>Something Beautiful</h4>
-                <p style="color:#eee">Bloom Studio<br>hello@bloomstudio.in</p>
             </div>
-        </div>
-        <div class="proposal-footer">
-            <span>📄 12 slides · Corporate Proposal · Aptos font</span>
-            <a href="/">Recreate this proposal →</a>
         </div>
     </div>
-
-    <!-- Proposal 2: Wedding Decor -->
-    <div class="proposal">
-        <div class="proposal-header">
-            <div>
-                <h3>Wedding Decor — Lotus Theme Collection</h3>
-                <span style="font-size:13px;color:var(--text2)">Bloom Studio → Priya & Arjun &nbsp;·&nbsp; Jan 22, 2026</span>
-            </div>
-            <div class="meta">
-                <div class="price">₹95,000</div>
-                <span class="status accepted">Accepted</span>
-            </div>
+    <div class="proposal-foot">
+        <div class="pf-tags">
+            <span class="pf-tag">📄 12 slides</span>
+            <span class="pf-tag">🏢 Corporate</span>
+            <span class="pf-tag">🔤 Aptos</span>
         </div>
-        <div class="slides-container">
-            <div class="slide" style="background:linear-gradient(135deg,#2d132c,#801336)">
-                <div class="slide-num">1</div>
-                <h4 style="color:#f5c6a5">Lotus Theme<br>Collection</h4>
-                <p style="color:#eee">A bespoke wedding experience<br>for Priya & Arjun</p>
-                <span class="tag">CREATIVE PITCH</span>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#801336,#c62a88)">
-                <div class="slide-num">2</div>
-                <h4 style="color:#f5c6a5">Your Vision</h4>
-                <p style="color:#eee">A celebration that honors tradition while feeling modern, intimate, and uniquely yours. Lotus symbolism throughout.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#c62a88,#801336)">
-                <div class="slide-num">3</div>
-                <h4 style="color:#f5c6a5">Mandap Design</h4>
-                <p style="color:#eee">Hand-carved wooden structure with cascading lotus garlands, silk draping in ivory and blush, and hanging brass diyas.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#801336,#2d132c)">
-                <div class="slide-num">4</div>
-                <h4 style="color:#f5c6a5">Table Settings</h4>
-                <p style="color:#eee">Brass lotus-shaped candle holders, hand-painted menu cards, silk runners with Rajasthani block prints, fresh flower rangoli.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#2d132c,#801336)">
-                <div class="slide-num">5</div>
-                <h4 style="color:#f5c6a5">Entrance Arch</h4>
-                <p style="color:#eee">12-foot arch with woven jasmine and marigold base, oversized paper lotus blooms, and warm LED fairy lights.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#801336,#c62a88)">
-                <div class="slide-num">6</div>
-                <h4 style="color:#f5c6a5">Lighting Design</h4>
-                <p style="color:#eee">Warm amber uplighting, floating lotus candles in water features, vintage brass lanterns along pathways.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#c62a88,#801336)">
-                <div class="slide-num">7</div>
-                <h4 style="color:#f5c6a5">Investment</h4>
-                <p style="color:#eee">Complete package: ₹95,000<br>Includes setup, materials, lighting, breakdown<br>Travel within Jaipur included.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#801336,#2d132c)">
-                <div class="slide-num">8</div>
-                <h4 style="color:#f5c6a5">Let's Make Your<br>Day Magical ✨</h4>
-                <p style="color:#eee">Bloom Studio<br>hello@bloomstudio.in</p>
-            </div>
-        </div>
-        <div class="proposal-footer">
-            <span>📄 8 slides · Creative Pitch · Warm tone</span>
-            <a href="/">Recreate this proposal →</a>
-        </div>
-    </div>
-
-    <!-- Proposal 3: Corporate Workshop -->
-    <div class="proposal">
-        <div class="proposal-header">
-            <div>
-                <h3>Corporate Art Workshop — Q1 Team Building</h3>
-                <span style="font-size:13px;color:var(--text2)">Bloom Studio → TechNova Solutions &nbsp;·&nbsp; Feb 14, 2026</span>
-            </div>
-            <div class="meta">
-                <div class="price">₹45,000</div>
-                <span class="status draft">Draft</span>
-            </div>
-        </div>
-        <div class="slides-container">
-            <div class="slide" style="background:linear-gradient(135deg,#0a192f,#172a45)">
-                <div class="slide-num">1</div>
-                <h4 style="color:#64ffda">Art & Team<br>Workshop</h4>
-                <p style="color:#ccd6f6">Prepared for TechNova Solutions<br>Q1 Team Building</p>
-                <span class="tag">CORPORATE</span>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#172a45,#0a192f)">
-                <div class="slide-num">2</div>
-                <h4 style="color:#64ffda">Why Art?</h4>
-                <p style="color:#ccd6f6">Creative activities boost lateral thinking by 40%, reduce stress, and build trust between team members in ways offsite meetings can't.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#0a192f,#172a45)">
-                <div class="slide-num">3</div>
-                <h4 style="color:#64ffda">The Experience</h4>
-                <p style="color:#ccd6f6">3-hour session: Watercolor basics (45min) → Guided landscape (60min) → Collaborative mural (75min) → Gallery walk & awards.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#172a45,#0a192f)">
-                <div class="slide-num">4</div>
-                <h4 style="color:#64ffda">What's Included</h4>
-                <p style="color:#ccd6f6">All materials (brushes, paints, canvas), 2 professional instructors, aprons, 4x6ft collaborative canvas, framing for individual works.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#0a192f,#172a45)">
-                <div class="slide-num">5</div>
-                <h4 style="color:#64ffda">Investment</h4>
-                <p style="color:#ccd6f6">₹45,000 for up to 25 participants<br>Includes all materials, instruction, and a finished mural for your office.</p>
-            </div>
-            <div class="slide" style="background:linear-gradient(135deg,#172a45,#0a192f)">
-                <div class="slide-num">6</div>
-                <h4 style="color:#64ffda">Let's Create<br>Together 🎨</h4>
-                <p style="color:#ccd6f6">Bloom Studio<br>hello@bloomstudio.in</p>
-            </div>
-        </div>
-        <div class="proposal-footer">
-            <span>📄 6 slides · Corporate Proposal · Clean tone</span>
-            <a href="/">Recreate this proposal →</a>
-        </div>
+        <a href="/">Recreate this →</a>
     </div>
 </div>
+
+<!-- ═══ PROPOSAL 2: Wedding Decor ═══ -->
+<div class="proposal">
+    <div class="proposal-label" style="color:#f5c6a5">● PROPOSAL 02</div>
+    <div class="proposal-head theme-wedding">
+        <div class="ph-left">
+            <h3>Wedding Decor — Lotus Theme Collection</h3>
+            <div class="ph-meta">
+                <span>Bloom Studio → Priya &amp; Arjun</span>
+                <span class="sep">·</span>
+                <span>Jan 22, 2026</span>
+                <span class="sep">·</span>
+                <span>8 slides</span>
+            </div>
+        </div>
+        <div class="ph-right">
+            <div class="price">₹95,000</div>
+            <span class="status accepted">Accepted</span>
+        </div>
+    </div>
+    <div class="scroll-hint"><span>Scroll slides</span> <span class="arrow">→</span></div>
+    <div class="slides-wrapper">
+        <div class="slides-scroll">
+            <div class="slide theme-wed">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#f5c6a5"></div>
+                    <div class="corner br" style="color:#f5c6a5"></div>
+                    <div class="circle" style="width:180px;height:180px;right:-50px;bottom:-50px;background:#c62a88"></div>
+                </div>
+                <div class="slide-inner slide-title">
+                    <span class="tag">CREATIVE PITCH</span>
+                    <h4 style="color:#f5c6a5;margin-top:12px">Lotus Theme<br>Collection</h4>
+                    <div class="divider" style="background:linear-gradient(90deg,#f5c6a5,#c62a88);margin:8px auto"></div>
+                    <p style="color:#eee;font-size:12px">A bespoke wedding experience for <strong>Priya &amp; Arjun</strong></p>
+                    <span class="company-from" style="color:#d4a9b8">BY BLOOM STUDIO</span>
+                </div>
+                <div class="slide-num">01</div>
+            </div>
+            <div class="slide theme-wed-alt">
+                <div class="slide-deco"><div class="corner tl" style="color:#f5c6a5"></div><div class="dots" style="right:16px;bottom:16px;color:#f5c6a5"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#f5c6a5">YOUR VISION</span>
+                    <h4>Modern Tradition</h4>
+                    <div class="divider"></div>
+                    <p>A celebration that honors tradition while feeling intimate, modern, and uniquely yours. Lotus symbolism woven throughout every detail.</p>
+                </div>
+                <div class="slide-num">02</div>
+            </div>
+            <div class="slide theme-wed-accent">
+                <div class="slide-deco"><div class="corner tl" style="color:#f5c6a5"></div><div class="corner br" style="color:#f5c6a5"></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#f5c6a5">CENTREPIECE</span>
+                    <h4>Mandap Design</h4>
+                    <div class="divider" style="background:linear-gradient(90deg,#f5c6a5,#c62a88)"></div>
+                    <p>Hand-carved wooden structure with cascading lotus garlands, silk draping in ivory and blush, and hanging brass diyas creating warm, ambient glow.</p>
+                </div>
+                <div class="slide-num">03</div>
+            </div>
+            <div class="slide theme-wed">
+                <div class="slide-deco"><div class="circle" style="width:100px;height:100px;left:-30px;top:-30px;background:#c62a88"></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#f5c6a5">DETAILS</span>
+                    <h4>Table Settings</h4>
+                    <div class="divider" style="background:linear-gradient(90deg,#f5c6a5,#c62a88)"></div>
+                    <ul class="slide-list">
+                        <li style="--c:#f5c6a5">Brass lotus candle holders</li>
+                        <li style="--c:#f5c6a5">Hand-painted menu cards</li>
+                        <li style="--c:#f5c6a5">Silk Rajasthani block-print runners</li>
+                        <li style="--c:#f5c6a5">Fresh flower rangoli</li>
+                    </ul>
+                </div>
+                <div class="slide-num">04</div>
+            </div>
+            <div class="slide theme-wed-alt">
+                <div class="slide-deco"><div class="corner tl" style="color:#f5c6a5"></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#f5c6a5">ENTRANCE</span>
+                    <h4>Welcome Arch</h4>
+                    <div class="divider" style="background:linear-gradient(90deg,#f5c6a5,#c62a88)"></div>
+                    <p>12-foot arch with woven jasmine and marigold base, oversized paper lotus blooms, and warm LED fairy lights creating a magical first impression.</p>
+                </div>
+                <div class="slide-num">05</div>
+            </div>
+            <div class="slide theme-wed-accent">
+                <div class="slide-deco"><div class="dots" style="left:16px;bottom:16px;color:#f5c6a5"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#f5c6a5">AMBIENCE</span>
+                    <h4>Lighting Design</h4>
+                    <div class="divider" style="background:linear-gradient(90deg,#f5c6a5,#c62a88)"></div>
+                    <p>Warm amber uplighting, floating lotus candles in water features, vintage brass lanterns along pathways, and canopy fairy lights.</p>
+                </div>
+                <div class="slide-num">06</div>
+            </div>
+            <div class="slide theme-wed">
+                <div class="slide-deco"><div class="corner tl" style="color:#f5c6a5"></div><div class="corner br" style="color:#f5c6a5"></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#f5c6a5">INVESTMENT</span>
+                    <h4>₹95,000</h4>
+                    <div class="divider" style="background:linear-gradient(90deg,#f5c6a5,#c62a88)"></div>
+                    <p>Complete package including setup, all materials, lighting, day-of coordination, and breakdown. Travel within Jaipur included.</p>
+                    <div class="metric-row">
+                        <div class="metric"><div class="mv" style="color:#f5c6a5">40%</div><div class="ml">Booking</div></div>
+                        <div class="metric"><div class="mv" style="color:#f5c6a5">60%</div><div class="ml">Event Day</div></div>
+                    </div>
+                </div>
+                <div class="slide-num">07</div>
+            </div>
+            <div class="slide theme-wed-accent">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#f5c6a5"></div><div class="corner br" style="color:#f5c6a5"></div>
+                    <div class="circle" style="width:200px;height:200px;left:50%;top:50%;transform:translate(-50%,-50%);background:#c62a88;opacity:.06"></div>
+                </div>
+                <div class="slide-inner slide-end">
+                    <h4 style="color:#f5c6a5">Let's Make Your<br>Day Magical ✨</h4>
+                    <div class="divider" style="background:linear-gradient(90deg,#f5c6a5,#c62a88);margin:10px auto"></div>
+                    <span class="contact" style="color:#d4a9b8">hello@bloomstudio.in<br>+91 98765 43210</span>
+                </div>
+                <div class="slide-num">08</div>
+            </div>
+        </div>
+    </div>
+    <div class="proposal-foot">
+        <div class="pf-tags">
+            <span class="pf-tag">📄 8 slides</span>
+            <span class="pf-tag">💒 Creative Pitch</span>
+            <span class="pf-tag">🌸 Warm Tone</span>
+        </div>
+        <a href="/">Recreate this →</a>
+    </div>
+</div>
+
+<!-- ═══ PROPOSAL 3: Corporate Workshop ═══ -->
+<div class="proposal">
+    <div class="proposal-label" style="color:#64ffda">● PROPOSAL 03</div>
+    <div class="proposal-head theme-workshop">
+        <div class="ph-left">
+            <h3>Corporate Art Workshop — Q1 Team Building</h3>
+            <div class="ph-meta">
+                <span>Bloom Studio → TechNova Solutions</span>
+                <span class="sep">·</span>
+                <span>Feb 14, 2026</span>
+                <span class="sep">·</span>
+                <span>6 slides</span>
+            </div>
+        </div>
+        <div class="ph-right">
+            <div class="price">₹45,000</div>
+            <span class="status draft">Draft</span>
+        </div>
+    </div>
+    <div class="scroll-hint"><span>Scroll slides</span> <span class="arrow">→</span></div>
+    <div class="slides-wrapper">
+        <div class="slides-scroll">
+            <div class="slide theme-wk">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#64ffda"></div>
+                    <div class="corner br" style="color:#64ffda"></div>
+                    <div class="circle" style="width:180px;height:180px;right:-50px;bottom:-50px;background:#64ffda"></div>
+                </div>
+                <div class="slide-inner slide-title">
+                    <span class="tag">CORPORATE PROPOSAL</span>
+                    <h4 style="color:#64ffda;margin-top:12px">Art &amp; Team<br>Workshop</h4>
+                    <div class="divider" style="background:#64ffda;margin:8px auto"></div>
+                    <p style="color:#ccd6f6;font-size:12px">Prepared for <strong>TechNova Solutions</strong></p>
+                    <span class="company-from" style="color:#64ffda">Q1 TEAM BUILDING</span>
+                </div>
+                <div class="slide-num">01</div>
+            </div>
+            <div class="slide theme-wk-alt">
+                <div class="slide-deco"><div class="corner tl" style="color:#64ffda"></div><div class="dots" style="right:16px;bottom:16px;color:#64ffda"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#64ffda">WHY ART?</span>
+                    <h4>Creative Impact</h4>
+                    <div class="divider" style="background:#64ffda"></div>
+                    <p>Creative activities boost lateral thinking, reduce stress, and build trust between team members in ways traditional offsites can't match.</p>
+                    <div class="metric-row">
+                        <div class="metric"><div class="mv" style="color:#64ffda">40%</div><div class="ml">Creativity ↑</div></div>
+                        <div class="metric"><div class="mv" style="color:#64ffda">67%</div><div class="ml">Team Trust ↑</div></div>
+                    </div>
+                </div>
+                <div class="slide-num">02</div>
+            </div>
+            <div class="slide theme-wk-accent">
+                <div class="slide-deco"><div class="corner tl" style="color:#64ffda"></div><div class="corner br" style="color:#64ffda"></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#64ffda">THE EXPERIENCE</span>
+                    <h4>3-Hour Session</h4>
+                    <div class="divider" style="background:#64ffda"></div>
+                    <div class="timeline-row">
+                        <div class="tl-step"><span>45 min<br><strong style="color:#64ffda">Basics</strong></span></div>
+                        <div class="tl-step"><span>60 min<br><strong style="color:#64ffda">Guided</strong></span></div>
+                        <div class="tl-step"><span>75 min<br><strong style="color:#64ffda">Mural</strong></span></div>
+                        <div class="tl-step"><span>Gallery<br><strong style="color:#64ffda">Walk</strong></span></div>
+                    </div>
+                </div>
+                <div class="slide-num">03</div>
+            </div>
+            <div class="slide theme-wk">
+                <div class="slide-deco"><div class="circle" style="width:120px;height:120px;left:-30px;bottom:-30px;background:#64ffda"></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#64ffda">INCLUDED</span>
+                    <h4>What's Provided</h4>
+                    <div class="divider" style="background:#64ffda"></div>
+                    <ul class="slide-list">
+                        <li style="--c:#64ffda">All materials (brushes, paints, canvas)</li>
+                        <li style="--c:#64ffda">2 professional art instructors</li>
+                        <li style="--c:#64ffda">Aprons for all participants</li>
+                        <li style="--c:#64ffda">4×6ft collaborative canvas</li>
+                        <li style="--c:#64ffda">Framing for individual works</li>
+                    </ul>
+                </div>
+                <div class="slide-num">04</div>
+            </div>
+            <div class="slide theme-wk-alt">
+                <div class="slide-deco"><div class="corner tl" style="color:#64ffda"></div><div class="corner br" style="color:#64ffda"></div></div>
+                <div class="slide-inner">
+                    <span class="slide-label" style="color:#64ffda">INVESTMENT</span>
+                    <h4>₹45,000</h4>
+                    <div class="divider" style="background:#64ffda"></div>
+                    <p>For up to 25 participants. Includes all materials, instruction, venue setup, and a finished mural for your office wall.</p>
+                    <div class="metric-row">
+                        <div class="metric"><div class="mv" style="color:#64ffda">25</div><div class="ml">Max People</div></div>
+                        <div class="metric"><div class="mv" style="color:#64ffda">3hr</div><div class="ml">Duration</div></div>
+                    </div>
+                </div>
+                <div class="slide-num">05</div>
+            </div>
+            <div class="slide theme-wk-accent">
+                <div class="slide-deco">
+                    <div class="corner tl" style="color:#64ffda"></div><div class="corner br" style="color:#64ffda"></div>
+                    <div class="circle" style="width:200px;height:200px;left:50%;top:50%;transform:translate(-50%,-50%);background:#64ffda;opacity:.04"></div>
+                </div>
+                <div class="slide-inner slide-end">
+                    <h4 style="color:#64ffda">Let's Create<br>Together 🎨</h4>
+                    <div class="divider" style="background:#64ffda;margin:10px auto"></div>
+                    <span class="contact" style="color:#8892b0">hello@bloomstudio.in<br>+91 98765 43210</span>
+                    <span class="tag" style="margin-top:12px">BLOOM STUDIO</span>
+                </div>
+                <div class="slide-num">06</div>
+            </div>
+        </div>
+    </div>
+    <div class="proposal-foot">
+        <div class="pf-tags">
+            <span class="pf-tag">📄 6 slides</span>
+            <span class="pf-tag">🏢 Corporate</span>
+            <span class="pf-tag">🎨 Creative</span>
+        </div>
+        <a href="/">Recreate this →</a>
+    </div>
+</div>
+
+</div>
+
+<style>
+.slide-list li::before{background:var(--c, #888)}
+.tl-step::before{background:var(--c, #888)}
+.tl-step::after{background:var(--c, #888)}
+</style>
 </body></html>'''
