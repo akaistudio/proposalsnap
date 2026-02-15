@@ -571,4 +571,250 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=port, debug=True)
 
 @app.route('/demo')
-def demo(): return redirect('/')
+def demo():
+    hub_url = os.environ.get('HUB_URL', 'https://snapsuite.up.railway.app')
+    return render_template_string(DEMO_GALLERY_HTML, hub_url=hub_url)
+
+DEMO_GALLERY_HTML = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProposalSnap — Demo Gallery</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0B0F1A;--surface:#141926;--border:#2A3148;--text:#E8ECF4;--text2:#8B95B0;--blue:#3B82F6;--green:#4ADE80;--red:#F87171;--orange:#FBBF24;--purple:#A78BFA;--teal:#2DD4BF}
+*{margin:0;padding:0;box-sizing:border-box}body{font-family:"DM Sans",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
+.topbar h1{font-size:20px;font-weight:800;color:#fff}.topbar h1 span{background:linear-gradient(135deg,var(--blue),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.topbar a{font-size:13px;color:var(--text2);text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:600}.topbar a:hover{background:var(--border)}
+.topbar .cta{background:linear-gradient(135deg,var(--blue),var(--purple));color:#fff}
+.main{max-width:1100px;margin:0 auto;padding:32px 24px}
+h2{font-size:28px;font-weight:900;color:#fff;margin-bottom:6px}
+.sub{font-size:15px;color:var(--text2);margin-bottom:32px}
+.proposal{background:var(--surface);border:1px solid var(--border);border-radius:16px;margin-bottom:28px;overflow:hidden}
+.proposal-header{padding:24px 28px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.proposal-header h3{font-size:20px;font-weight:800;color:#fff}
+.proposal-header .meta{text-align:right}
+.proposal-header .price{font-size:22px;font-weight:800;color:#fff}
+.status{display:inline-block;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700}
+.status.sent{background:rgba(59,130,246,.15);color:var(--blue)}
+.status.accepted{background:rgba(74,222,128,.15);color:var(--green)}
+.status.draft{background:rgba(139,149,176,.12);color:var(--text2)}
+.slides-container{padding:20px 28px;overflow-x:auto;display:flex;gap:16px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.slides-container::-webkit-scrollbar{height:6px}.slides-container::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.slide{min-width:280px;max-width:280px;aspect-ratio:16/9;border-radius:10px;padding:20px;display:flex;flex-direction:column;justify-content:center;position:relative;flex-shrink:0;border:1px solid rgba(255,255,255,.05)}
+.slide .slide-num{position:absolute;top:8px;right:10px;font-size:10px;color:rgba(255,255,255,.4);font-weight:700}
+.slide h4{font-size:14px;font-weight:800;line-height:1.3;margin-bottom:6px}
+.slide p{font-size:10px;line-height:1.5;opacity:.75}
+.slide .tag{font-size:9px;padding:2px 6px;border-radius:4px;background:rgba(255,255,255,.15);display:inline-block;margin-top:6px;font-weight:600}
+.proposal-footer{padding:14px 28px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.proposal-footer span{font-size:12px;color:var(--text2)}
+.proposal-footer a{font-size:13px;color:var(--blue);text-decoration:none;font-weight:700}
+</style>
+</head>
+<body>
+<div class="topbar">
+    <h1>Proposal<span>Snap</span></h1>
+    <div style="display:flex;gap:8px">
+        <a href="{{ hub_url }}">← SnapSuite</a>
+        <a href="/" class="cta">+ Create New</a>
+    </div>
+</div>
+<div class="main">
+    <h2>Sample Proposals</h2>
+    <p class="sub">AI-generated pitch decks created with ProposalSnap. Each was built in under 30 seconds.</p>
+
+    <!-- Proposal 1: Brand Identity -->
+    <div class="proposal">
+        <div class="proposal-header">
+            <div>
+                <h3>Brand Identity Package</h3>
+                <span style="font-size:13px;color:var(--text2)">Bloom Studio → Varnam Artboutique &nbsp;·&nbsp; Feb 10, 2026</span>
+            </div>
+            <div class="meta">
+                <div class="price">₹1,85,000</div>
+                <span class="status sent">Sent</span>
+            </div>
+        </div>
+        <div class="slides-container">
+            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
+                <div class="slide-num">1</div>
+                <h4 style="color:#e94560">Brand Identity<br>Package</h4>
+                <p style="color:#eee">Prepared for Varnam Artboutique<br>by Bloom Studio</p>
+                <span class="tag">CORPORATE PROPOSAL</span>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#16213e,#0f3460)">
+                <div class="slide-num">2</div>
+                <h4 style="color:#e94560">The Challenge</h4>
+                <p style="color:#ccc">Varnam Artboutique is expanding into international markets. Their current branding doesn't reflect their premium positioning or cultural heritage.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#0f3460,#16213e)">
+                <div class="slide-num">3</div>
+                <h4 style="color:#e94560">Our Approach</h4>
+                <p style="color:#ccc">Discovery & audit → Concept development → Design system → Brand guidelines → Collateral design → Handoff & training</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#16213e,#1a1a2e)">
+                <div class="slide-num">4</div>
+                <h4 style="color:#e94560">Logo Redesign</h4>
+                <p style="color:#ccc">Modern mark blending Madhubani art motifs with clean contemporary typography. Primary, secondary, and icon variations.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#0f3460)">
+                <div class="slide-num">5</div>
+                <h4 style="color:#e94560">Color Palette</h4>
+                <p style="color:#ccc">Rich earth tones paired with vibrant accent colors inspired by traditional Indian textiles and natural dyes.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#0f3460,#1a1a2e)">
+                <div class="slide-num">6</div>
+                <h4 style="color:#e94560">Typography</h4>
+                <p style="color:#ccc">Primary: custom serif for headlines. Secondary: clean sans-serif for body. Hindi script: matching Devanagari family.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
+                <div class="slide-num">7</div>
+                <h4 style="color:#e94560">Collateral Design</h4>
+                <p style="color:#ccc">Business cards, letterhead, envelopes, packaging inserts, thank-you cards, exhibition banners, social media templates.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#16213e,#1a1a2e)">
+                <div class="slide-num">8</div>
+                <h4 style="color:#e94560">Digital Presence</h4>
+                <p style="color:#ccc">Website UI kit, email templates, Instagram grid layout, WhatsApp catalog design, and Google Business profile assets.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#0f3460)">
+                <div class="slide-num">9</div>
+                <h4 style="color:#e94560">Brand Guidelines</h4>
+                <p style="color:#ccc">60-page comprehensive guide covering logo usage, do's/don'ts, spacing rules, color specs (CMYK, RGB, Pantone), and voice & tone.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#0f3460,#16213e)">
+                <div class="slide-num">10</div>
+                <h4 style="color:#e94560">Timeline</h4>
+                <p style="color:#ccc">Week 1-2: Discovery · Week 3-4: Concepts · Week 5-6: Refinement · Week 7-8: Collateral · Week 9-10: Guidelines & Handoff</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#16213e,#1a1a2e)">
+                <div class="slide-num">11</div>
+                <h4 style="color:#e94560">Investment</h4>
+                <p style="color:#ccc">Complete package: ₹1,85,000<br>50% upfront · 25% at concepts · 25% at delivery<br>Includes 3 revision rounds per phase.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#1a1a2e,#16213e)">
+                <div class="slide-num">12</div>
+                <h4 style="color:#e94560">Let's Create<br>Something Beautiful</h4>
+                <p style="color:#eee">Bloom Studio<br>hello@bloomstudio.in</p>
+            </div>
+        </div>
+        <div class="proposal-footer">
+            <span>📄 12 slides · Corporate Proposal · Aptos font</span>
+            <a href="/">Recreate this proposal →</a>
+        </div>
+    </div>
+
+    <!-- Proposal 2: Wedding Decor -->
+    <div class="proposal">
+        <div class="proposal-header">
+            <div>
+                <h3>Wedding Decor — Lotus Theme Collection</h3>
+                <span style="font-size:13px;color:var(--text2)">Bloom Studio → Priya & Arjun &nbsp;·&nbsp; Jan 22, 2026</span>
+            </div>
+            <div class="meta">
+                <div class="price">₹95,000</div>
+                <span class="status accepted">Accepted</span>
+            </div>
+        </div>
+        <div class="slides-container">
+            <div class="slide" style="background:linear-gradient(135deg,#2d132c,#801336)">
+                <div class="slide-num">1</div>
+                <h4 style="color:#f5c6a5">Lotus Theme<br>Collection</h4>
+                <p style="color:#eee">A bespoke wedding experience<br>for Priya & Arjun</p>
+                <span class="tag">CREATIVE PITCH</span>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#801336,#c62a88)">
+                <div class="slide-num">2</div>
+                <h4 style="color:#f5c6a5">Your Vision</h4>
+                <p style="color:#eee">A celebration that honors tradition while feeling modern, intimate, and uniquely yours. Lotus symbolism throughout.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#c62a88,#801336)">
+                <div class="slide-num">3</div>
+                <h4 style="color:#f5c6a5">Mandap Design</h4>
+                <p style="color:#eee">Hand-carved wooden structure with cascading lotus garlands, silk draping in ivory and blush, and hanging brass diyas.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#801336,#2d132c)">
+                <div class="slide-num">4</div>
+                <h4 style="color:#f5c6a5">Table Settings</h4>
+                <p style="color:#eee">Brass lotus-shaped candle holders, hand-painted menu cards, silk runners with Rajasthani block prints, fresh flower rangoli.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#2d132c,#801336)">
+                <div class="slide-num">5</div>
+                <h4 style="color:#f5c6a5">Entrance Arch</h4>
+                <p style="color:#eee">12-foot arch with woven jasmine and marigold base, oversized paper lotus blooms, and warm LED fairy lights.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#801336,#c62a88)">
+                <div class="slide-num">6</div>
+                <h4 style="color:#f5c6a5">Lighting Design</h4>
+                <p style="color:#eee">Warm amber uplighting, floating lotus candles in water features, vintage brass lanterns along pathways.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#c62a88,#801336)">
+                <div class="slide-num">7</div>
+                <h4 style="color:#f5c6a5">Investment</h4>
+                <p style="color:#eee">Complete package: ₹95,000<br>Includes setup, materials, lighting, breakdown<br>Travel within Jaipur included.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#801336,#2d132c)">
+                <div class="slide-num">8</div>
+                <h4 style="color:#f5c6a5">Let's Make Your<br>Day Magical ✨</h4>
+                <p style="color:#eee">Bloom Studio<br>hello@bloomstudio.in</p>
+            </div>
+        </div>
+        <div class="proposal-footer">
+            <span>📄 8 slides · Creative Pitch · Warm tone</span>
+            <a href="/">Recreate this proposal →</a>
+        </div>
+    </div>
+
+    <!-- Proposal 3: Corporate Workshop -->
+    <div class="proposal">
+        <div class="proposal-header">
+            <div>
+                <h3>Corporate Art Workshop — Q1 Team Building</h3>
+                <span style="font-size:13px;color:var(--text2)">Bloom Studio → TechNova Solutions &nbsp;·&nbsp; Feb 14, 2026</span>
+            </div>
+            <div class="meta">
+                <div class="price">₹45,000</div>
+                <span class="status draft">Draft</span>
+            </div>
+        </div>
+        <div class="slides-container">
+            <div class="slide" style="background:linear-gradient(135deg,#0a192f,#172a45)">
+                <div class="slide-num">1</div>
+                <h4 style="color:#64ffda">Art & Team<br>Workshop</h4>
+                <p style="color:#ccd6f6">Prepared for TechNova Solutions<br>Q1 Team Building</p>
+                <span class="tag">CORPORATE</span>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#172a45,#0a192f)">
+                <div class="slide-num">2</div>
+                <h4 style="color:#64ffda">Why Art?</h4>
+                <p style="color:#ccd6f6">Creative activities boost lateral thinking by 40%, reduce stress, and build trust between team members in ways offsite meetings can't.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#0a192f,#172a45)">
+                <div class="slide-num">3</div>
+                <h4 style="color:#64ffda">The Experience</h4>
+                <p style="color:#ccd6f6">3-hour session: Watercolor basics (45min) → Guided landscape (60min) → Collaborative mural (75min) → Gallery walk & awards.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#172a45,#0a192f)">
+                <div class="slide-num">4</div>
+                <h4 style="color:#64ffda">What's Included</h4>
+                <p style="color:#ccd6f6">All materials (brushes, paints, canvas), 2 professional instructors, aprons, 4x6ft collaborative canvas, framing for individual works.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#0a192f,#172a45)">
+                <div class="slide-num">5</div>
+                <h4 style="color:#64ffda">Investment</h4>
+                <p style="color:#ccd6f6">₹45,000 for up to 25 participants<br>Includes all materials, instruction, and a finished mural for your office.</p>
+            </div>
+            <div class="slide" style="background:linear-gradient(135deg,#172a45,#0a192f)">
+                <div class="slide-num">6</div>
+                <h4 style="color:#64ffda">Let's Create<br>Together 🎨</h4>
+                <p style="color:#ccd6f6">Bloom Studio<br>hello@bloomstudio.in</p>
+            </div>
+        </div>
+        <div class="proposal-footer">
+            <span>📄 6 slides · Corporate Proposal · Clean tone</span>
+            <a href="/">Recreate this proposal →</a>
+        </div>
+    </div>
+</div>
+</body></html>'''
