@@ -96,7 +96,7 @@ def default_colors():
 # ── Claude API ────────────────────────────────────────────────
 def generate_slide_content(client_name, company_name, pres_type, tone, key_points, num_slides=12):
     """Use Claude to generate structured slide content"""
-    prompt = f"""Generate a professional {pres_type} presentation structure.
+    prompt = f"""Generate a professional {pres_type} presentation structure with STRONG visual variety.
 
 Client: {client_name}
 Presenting Company: {company_name}
@@ -107,29 +107,38 @@ Key Points / Requirements:
 {key_points}
 
 Return ONLY a valid JSON array of slide objects. Each slide MUST have these fields:
-- "layout": one of "title", "agenda", "content", "two_column", "stats", "timeline", "pricing", "team", "closing"
+- "layout": one of the layouts below
 - "title": slide title
 - Additional fields based on layout:
 
-For "title": subtitle (string)
-For "agenda": bullets (array of strings, 5-7 items)
-For "content": bullets (array of 3-5 strings) OR body (paragraph text), optional subtitle
-For "two_column": left_title, left_bullets (array), right_title, right_bullets (array)
-For "stats": stats (array of objects with value, label, description)
-For "timeline": steps (array of objects with phase, description, duration)
-For "pricing": tiers (array of objects with name, price, features array, highlight boolean)
-For "team": members (array of objects with name, role, bio)
-For "closing": subtitle, contact (string)
+AVAILABLE LAYOUTS:
+
+"title": Opening slide. Fields: subtitle (string)
+"agenda": Overview of what's covered. Fields: bullets (array of 5-7 strings)
+"content": Standard text slide. Fields: bullets (array of 3-5 strings) OR body (paragraph), optional subtitle
+"two_column": Side-by-side comparison. Fields: left_title, left_bullets (array), right_title, right_bullets (array)
+"stats": Big number metrics (2-4 cards). Fields: stats (array of {{value, label, description}})
+"timeline": Process/timeline steps. Fields: steps (array of {{phase, description, duration}})
+"pricing": Investment/tier cards. Fields: tiers (array of {{name, price, features[], highlight bool}})
+"team": Team member cards. Fields: members (array of {{name, role, bio}})
+"icon_grid": 4-6 feature/service cards with icons. Fields: items (array of {{icon, heading, description}}). icon should be a single emoji.
+"comparison": Before vs After or comparison table. Fields: left_label, right_label, rows (array of {{feature, left_value, right_value}})
+"quote": Testimonial or key statement. Fields: quote (string), attribution (string), role (string)
+"metric_bar": Horizontal progress bars. Fields: metrics (array of {{label, value, max_value, description}}). value and max_value are numbers (e.g. value:85, max_value:100)
+"process_flow": Numbered process with arrows. Fields: steps (array of {{number, title, description}})
+"checklist": Visual checklist/deliverables. Fields: items (array of strings), subtitle (string)
+"big_statement": One powerful sentence in large text. Fields: statement (string), supporting_text (string)
+"closing": Thank you slide. Fields: subtitle, contact (string)
 
 RULES:
-1. First slide MUST be layout "title"
-2. Second slide MUST be layout "agenda"
-3. Last slide MUST be layout "closing"
-4. Include at least one "stats" slide and one "timeline" slide
-5. Mix different layouts — do NOT use "content" for every slide
-6. Bullets should be concise but informative (10-20 words each)
-7. Stats should have realistic, specific numbers
-8. Make content specific to the client and key points provided
+1. First slide MUST be "title", second MUST be "agenda", last MUST be "closing"
+2. CRITICAL: Use at LEAST 6 different layout types. Do NOT repeat the same layout more than twice.
+3. ALWAYS include: at least one "stats", one "timeline" or "process_flow", and one of "icon_grid"/"comparison"/"metric_bar"
+4. Prefer visual layouts (stats, icon_grid, comparison, metric_bar, process_flow, checklist, quote) over plain "content"
+5. Use "content" for maximum 2 slides. Use visual layouts for the rest.
+6. Stats should have realistic, specific numbers
+7. Bullets should be concise (10-20 words each)
+8. Make content specific to the client and key points
 9. Return ONLY the JSON array, no other text
 
 Generate exactly {num_slides} slides."""
