@@ -11,7 +11,7 @@ from io import BytesIO
 
 import anthropic
 from PIL import Image
-from flask import Flask, request, jsonify, send_file, render_template_string
+from flask import Flask, request, jsonify, send_file, render_template_string, redirect
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
@@ -569,3 +569,6 @@ if __name__ == '__main__':
     print(f"  Open: http://localhost:{port}")
     print(f"{'='*50}\n")
     app.run(host='0.0.0.0', port=port, debug=True)
+
+@app.route('/demo')
+def demo(): return redirect('/')
