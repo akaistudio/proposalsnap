@@ -65,6 +65,9 @@ def init_db():
         migrations = [
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT FALSE",
             "UPDATE users SET is_superadmin = TRUE WHERE id = (SELECT MIN(id) FROM users)",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_logo TEXT DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_colors TEXT DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_font TEXT DEFAULT 'aptos'",
         ]
         for m in migrations:
             try: cur.execute(m)
@@ -327,6 +330,184 @@ RULES:
         text = text.rsplit("```", 1)[0]
     return json.loads(text)
 
+# ── Brand Management ───────────────────────────────────────────
+def get_user_brand():
+    """Load saved brand settings for current user"""
+    try:
+        uid = session.get('user_id')
+        if not uid: return None
+        conn = get_db()
+        if not conn: return None
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT brand_logo, brand_colors, brand_font FROM users WHERE id=%s', (uid,))
+        user = cur.fetchone()
+        conn.close()
+        if not user: return None
+        brand = {}
+        if user.get('brand_colors'):
+            try: brand['colors'] = json.loads(user['brand_colors'])
+            except: pass
+        if user.get('brand_logo') and Path(user['brand_logo']).exists():
+            brand['logo_path'] = user['brand_logo']
+        if user.get('brand_font'):
+            brand['font'] = user['brand_font']
+        return brand if brand else None
+    except: return None
+
+def apply_brand(colors, logo_path, font_style):
+    """Override with saved brand if user hasn't provided custom ones"""
+    brand = get_user_brand()
+    if not brand: return colors, logo_path, font_style
+    if not logo_path and brand.get('logo_path'):
+        logo_path = brand['logo_path']
+    if colors == default_colors() and brand.get('colors'):
+        colors = brand['colors']
+    if font_style == 'aptos' and brand.get('font'):
+        font_style = brand['font']
+    return colors, logo_path, font_style
+
+# ── Audience Versioning ───────────────────────────────────────
+def generate_audience_version(original_slides, audience_type, num_slides):
+    """Generate a version of the deck targeted at a specific audience"""
+    slides_text = json.dumps(original_slides, indent=2)
+
+    audiences = {
+        "executive": {
+            "desc": "C-suite executives with limited time",
+            "rules": "Maximum 6-8 slides. Lead with conclusion/recommendation. Use stats and big statements. Cut all technical details. Every slide must be answerable in 30 seconds.",
+            "default_slides": 6
+        },
+        "detailed": {
+            "desc": "Team members and managers who need full context",
+            "rules": "12-16 slides. Include all details, process flows, timelines, and supporting data. Use a mix of visual layouts. Keep the narrative comprehensive.",
+            "default_slides": 14
+        },
+        "investor": {
+            "desc": "Investors and board members evaluating opportunity",
+            "rules": "8-10 slides. Follow: Problem → Solution → Market → Traction → Model → Team → Ask. Make numbers and metrics prominent. Include comparison/competitive landscape. End with clear ask/next steps.",
+            "default_slides": 10
+        }
+    }
+
+    cfg = audiences.get(audience_type, audiences["detailed"])
+    slide_count = num_slides or cfg["default_slides"]
+
+    prompt = f"""You are a presentation expert creating a version of a deck for: {cfg["desc"]}
+
+ORIGINAL CONTENT:
+{slides_text}
+
+AUDIENCE RULES:
+{cfg["rules"]}
+
+Restructure and adapt the content for this audience. Generate exactly {slide_count} slides.
+
+Return ONLY a valid JSON array of slide objects. Each slide MUST have:
+- "layout": one of: title, agenda, content, two_column, stats, timeline, pricing, team, icon_grid, comparison, quote, metric_bar, process_flow, checklist, big_statement, closing
+- "title": slide title
+- Layout-specific fields (bullets, stats, steps, etc.)
+
+RULES:
+1. First slide = "title", last = "closing"
+2. Use at LEAST 5 different layout types
+3. Prefer visual layouts (stats, icon_grid, comparison, timeline, metric_bar) over plain "content"
+4. Keep bullets concise (10-20 words)
+5. Return ONLY the JSON array"""
+
+    response = client.messages.create(
+        model=MODEL, max_tokens=4000,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    text = response.content[0].text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        text = text.rsplit("```", 1)[0]
+    return json.loads(text)
+
+# ── Style Transfer ────────────────────────────────────────────
+def extract_style_from_pptx(filepath):
+    """Extract style patterns (structure, tone, layout types) from a reference deck"""
+    prs = PptxPresentation(filepath)
+    style_info = {
+        "total_slides": len(prs.slides),
+        "slide_structures": [],
+        "color_samples": [],
+        "font_samples": [],
+        "tone_samples": []
+    }
+
+    for i, slide in enumerate(prs.slides):
+        structure = {"slide_num": i + 1, "shape_count": len(slide.shapes), "has_table": False,
+                     "has_image": False, "text_blocks": 0, "texts": []}
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                structure["text_blocks"] += 1
+                for para in shape.text_frame.paragraphs:
+                    text = para.text.strip()
+                    if text:
+                        structure["texts"].append(text[:100])
+                    for run in para.runs:
+                        if run.font.color and run.font.color.rgb:
+                            style_info["color_samples"].append(str(run.font.color.rgb))
+                        if run.font.name:
+                            style_info["font_samples"].append(run.font.name)
+            if shape.has_table:
+                structure["has_table"] = True
+            if shape.shape_type == 13:  # picture
+                structure["has_image"] = True
+        style_info["slide_structures"].append(structure)
+        if structure["texts"]:
+            style_info["tone_samples"].extend(structure["texts"][:2])
+
+    return style_info
+
+def style_transfer_content(content_slides, style_info, instructions=""):
+    """Apply extracted style patterns to content"""
+    content_text = json.dumps(content_slides, indent=2)
+    style_text = json.dumps(style_info, indent=2)
+
+    prompt = f"""You are a presentation design expert. Apply the STYLE from a reference deck to the CONTENT of another deck.
+
+REFERENCE DECK STYLE:
+{style_text}
+
+CONTENT TO RESTYLE:
+{content_text}
+
+{"ADDITIONAL INSTRUCTIONS: " + instructions if instructions else ""}
+
+Analyze the reference deck's patterns:
+- How many slides and what structure (heavy on data? visual? minimal text?)
+- Tone of the text (formal? conversational? punchy?)
+- Use of tables, images, comparisons
+- Slide flow and organization
+
+Then restructure the content to MATCH that style while preserving the content's meaning.
+
+Return ONLY a valid JSON array of slide objects. Each slide MUST have:
+- "layout": one of: title, agenda, content, two_column, stats, timeline, pricing, team, icon_grid, comparison, quote, metric_bar, process_flow, checklist, big_statement, closing
+- "title": slide title
+- Layout-specific fields
+
+RULES:
+1. Match the reference deck's structure and rhythm
+2. If reference is concise (6-8 slides), output the same count. If detailed (15+), expand.
+3. If reference uses lots of data/stats, convert content into data-heavy layouts
+4. If reference is text-minimal, keep bullets very short
+5. First slide = "title", last = "closing"
+6. Use at LEAST 5 different layout types
+7. Return ONLY the JSON array"""
+
+    response = client.messages.create(
+        model=MODEL, max_tokens=4000,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    text = response.content[0].text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        text = text.rsplit("```", 1)[0]
+    return json.loads(text)
+
 # ── PPTX Generation ───────────────────────────────────────────
 def create_pptx(slides, colors, client_name, company_name, pres_type, tone, logo_path=None, font_style='aptos'):
     """Generate PPTX using Node.js pptxgenjs"""
@@ -404,6 +585,9 @@ def generate():
         # Generate content with Claude
         slides = generate_slide_content(client_name, company_name, pres_type, tone, key_points, num_slides)
         
+        # Apply saved brand if no custom logo/colors provided
+        colors, logo_path, font_style = apply_brand(colors, logo_path, font_style)
+        
         # Generate PPTX
         output_path = create_pptx(slides, colors, client_name, company_name, pres_type, tone, logo_path, font_style)
         
@@ -475,6 +659,9 @@ def polish():
             client_name = polished_slides[0].get('title', 'Polished Deck')
         company_name = request.form.get('company_name', '').strip()
 
+        # Apply saved brand if no custom logo/colors provided
+        colors, logo_path, font_style = apply_brand(colors, logo_path, font_style)
+
         # Generate polished PPTX
         output_path = create_pptx(polished_slides, colors, client_name, company_name,
                                   'Polished Presentation', tone, logo_path, font_style)
@@ -492,6 +679,300 @@ def polish():
         })
     except json.JSONDecodeError:
         return jsonify({"error": "AI failed to generate valid slide structure. Please try again."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+        return jsonify({"error": str(e)}), 500
+
+# ── Brand Settings ────────────────────────────────────────────
+@app.route('/api/brand', methods=['GET', 'POST'])
+def brand_settings():
+    uid = session.get('user_id')
+    if not uid: return jsonify({"error": "Not logged in"}), 401
+
+    conn = get_db()
+    if not conn: return jsonify({"error": "Database not configured"}), 500
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    if request.method == 'GET':
+        cur.execute('SELECT brand_logo, brand_colors, brand_font, company_name FROM users WHERE id=%s', (uid,))
+        user = cur.fetchone()
+        conn.close()
+        colors = {}
+        try: colors = json.loads(user.get('brand_colors') or '{}')
+        except: pass
+        return jsonify({"colors": colors, "font": user.get('brand_font', 'aptos'),
+                       "has_logo": bool(user.get('brand_logo')), "company": user.get('company_name', '')})
+
+    # POST — save brand
+    font = request.form.get('font', 'aptos')
+    cur.execute('UPDATE users SET brand_font=%s WHERE id=%s', (font, uid))
+
+    if 'logo' in request.files and request.files['logo'].filename:
+        logo_file = request.files['logo']
+        logo_ext = Path(logo_file.filename).suffix.lower()
+        if logo_ext in ('.png', '.jpg', '.jpeg', '.webp', '.svg'):
+            logo_id = str(uuid.uuid4())[:8]
+            logo_path = UPLOAD_DIR / f"brand_{uid}_{logo_id}{logo_ext}"
+            logo_file.save(str(logo_path))
+            colors = default_colors()
+            if logo_ext != '.svg':
+                colors = extract_colors_from_logo(str(logo_path))
+            cur.execute('UPDATE users SET brand_logo=%s, brand_colors=%s WHERE id=%s',
+                       (str(logo_path), json.dumps(colors), uid))
+
+    conn.close()
+    return jsonify({"success": True})
+
+# ── Audience Versioning ───────────────────────────────────────
+@app.route('/api/version', methods=['POST'])
+def version():
+    try:
+        if 'pptx_file' not in request.files or not request.files['pptx_file'].filename:
+            return jsonify({"error": "Please upload a PPTX file"}), 400
+
+        pptx_file = request.files['pptx_file']
+        upload_id = str(uuid.uuid4())[:8]
+        upload_path = UPLOAD_DIR / f"upload_{upload_id}.pptx"
+        pptx_file.save(str(upload_path))
+
+        original_slides = extract_slides_from_pptx(str(upload_path))
+        if not original_slides:
+            return jsonify({"error": "Could not extract content from file"}), 400
+
+        audiences = request.form.getlist('audiences') or ['executive', 'detailed', 'investor']
+        font_style = request.form.get('font_style', 'aptos')
+        client_name = request.form.get('client_name', '').strip() or 'Presentation'
+        company_name = request.form.get('company_name', '').strip()
+
+        # Handle logo / brand
+        logo_path = None
+        colors = default_colors()
+        if 'logo' in request.files and request.files['logo'].filename:
+            logo_file = request.files['logo']
+            logo_ext = Path(logo_file.filename).suffix.lower()
+            if logo_ext in ('.png', '.jpg', '.jpeg', '.webp', '.svg'):
+                lid = str(uuid.uuid4())[:8]
+                logo_path = UPLOAD_DIR / f"logo_{lid}{logo_ext}"
+                logo_file.save(str(logo_path))
+                if logo_ext != '.svg':
+                    colors = extract_colors_from_logo(str(logo_path))
+        colors, logo_path, font_style = apply_brand(colors, logo_path, font_style)
+
+        results = []
+        for audience in audiences:
+            try:
+                slides = generate_audience_version(original_slides, audience, num_slides=None)
+                output_path = create_pptx(slides, colors, client_name, company_name,
+                                         f'{audience.title()} Version', 'Corporate',
+                                         logo_path, font_style)
+                fname = f"{client_name.replace(' ', '_')}_{audience}.pptx"
+                log_usage(title=f"Version: {audience} — {client_name}", slides=len(slides))
+                results.append({
+                    "audience": audience,
+                    "download_url": f"/api/download/{Path(output_path).name}",
+                    "filename": fname,
+                    "slides_count": len(slides)
+                })
+            except Exception as e:
+                results.append({"audience": audience, "error": str(e)})
+
+        return jsonify({"success": True, "versions": results, "original_slides": len(original_slides)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Style Transfer ────────────────────────────────────────────
+@app.route('/api/style-transfer', methods=['POST'])
+def style_transfer():
+    try:
+        if 'content_file' not in request.files or not request.files['content_file'].filename:
+            return jsonify({"error": "Please upload your content PPTX"}), 400
+        if 'reference_file' not in request.files or not request.files['reference_file'].filename:
+            return jsonify({"error": "Please upload a reference/style PPTX"}), 400
+
+        uid = str(uuid.uuid4())[:8]
+
+        content_file = request.files['content_file']
+        content_path = UPLOAD_DIR / f"content_{uid}.pptx"
+        content_file.save(str(content_path))
+
+        ref_file = request.files['reference_file']
+        ref_path = UPLOAD_DIR / f"ref_{uid}.pptx"
+        ref_file.save(str(ref_path))
+
+        instructions = request.form.get('instructions', '').strip()
+        font_style = request.form.get('font_style', 'aptos')
+        client_name = request.form.get('client_name', '').strip() or 'Styled Deck'
+        company_name = request.form.get('company_name', '').strip()
+
+        content_slides = extract_slides_from_pptx(str(content_path))
+        if not content_slides:
+            return jsonify({"error": "Could not extract content from your deck"}), 400
+
+        style_info = extract_style_from_pptx(str(ref_path))
+
+        styled_slides = style_transfer_content(content_slides, style_info, instructions)
+
+        # Handle logo / brand
+        logo_path = None
+        colors = default_colors()
+        if 'logo' in request.files and request.files['logo'].filename:
+            logo_file = request.files['logo']
+            logo_ext = Path(logo_file.filename).suffix.lower()
+            if logo_ext in ('.png', '.jpg', '.jpeg', '.webp', '.svg'):
+                lid = str(uuid.uuid4())[:8]
+                logo_path = UPLOAD_DIR / f"logo_{lid}{logo_ext}"
+                logo_file.save(str(logo_path))
+                if logo_ext != '.svg':
+                    colors = extract_colors_from_logo(str(logo_path))
+        colors, logo_path, font_style = apply_brand(colors, logo_path, font_style)
+
+        output_path = create_pptx(styled_slides, colors, client_name, company_name,
+                                  'Styled Presentation', 'Corporate', logo_path, font_style)
+
+        fname = f"Styled_{client_name.replace(' ', '_')}.pptx"
+        log_usage(title=f"Style Transfer: {client_name}", slides=len(styled_slides))
+
+        return jsonify({
+            "success": True,
+            "download_url": f"/api/download/{Path(output_path).name}",
+            "filename": fname,
+            "slides_count": len(styled_slides),
+            "reference_slides": style_info["total_slides"],
+            "content_slides": len(content_slides)
+        })
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI failed to generate valid structure. Please try again."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Merge Decks ───────────────────────────────────────────────
+@app.route('/api/merge', methods=['POST'])
+def merge_decks():
+    try:
+        files = request.files.getlist('pptx_files')
+        if len(files) < 2:
+            return jsonify({"error": "Please upload at least 2 PPTX files to merge"}), 400
+
+        all_slides = []
+        file_names = []
+        for f in files:
+            if not f.filename.lower().endswith('.pptx'): continue
+            uid = str(uuid.uuid4())[:8]
+            fpath = UPLOAD_DIR / f"merge_{uid}.pptx"
+            f.save(str(fpath))
+            slides = extract_slides_from_pptx(str(fpath))
+            all_slides.extend(slides)
+            file_names.append(f.filename)
+
+        if not all_slides:
+            return jsonify({"error": "Could not extract content from uploaded files"}), 400
+
+        instructions = request.form.get('instructions', '').strip()
+        if not instructions:
+            instructions = "Combine all slide content into one cohesive presentation. Remove duplicate content. Create a unified narrative flow with a single title slide and closing slide."
+
+        font_style = request.form.get('font_style', 'aptos')
+        client_name = request.form.get('client_name', '').strip() or 'Merged Deck'
+        company_name = request.form.get('company_name', '').strip()
+        tone = request.form.get('tone', 'Corporate')
+
+        merged_slides = polish_slide_content(all_slides, instructions, num_slides=None, tone=tone)
+
+        logo_path = None
+        colors = default_colors()
+        if 'logo' in request.files and request.files['logo'].filename:
+            logo_file = request.files['logo']
+            logo_ext = Path(logo_file.filename).suffix.lower()
+            if logo_ext in ('.png', '.jpg', '.jpeg', '.webp', '.svg'):
+                lid = str(uuid.uuid4())[:8]
+                logo_path = UPLOAD_DIR / f"logo_{lid}{logo_ext}"
+                logo_file.save(str(logo_path))
+                if logo_ext != '.svg':
+                    colors = extract_colors_from_logo(str(logo_path))
+        colors, logo_path, font_style = apply_brand(colors, logo_path, font_style)
+
+        output_path = create_pptx(merged_slides, colors, client_name, company_name,
+                                  'Merged Presentation', tone, logo_path, font_style)
+
+        fname = f"Merged_{client_name.replace(' ', '_')}.pptx"
+        log_usage(title=f"Merge: {' + '.join(file_names)}", slides=len(merged_slides))
+
+        return jsonify({
+            "success": True,
+            "download_url": f"/api/download/{Path(output_path).name}",
+            "filename": fname,
+            "slides_count": len(merged_slides),
+            "source_files": len(files),
+            "source_slides": len(all_slides)
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ── Split Deck ────────────────────────────────────────────────
+@app.route('/api/split', methods=['POST'])
+def split_deck():
+    try:
+        if 'pptx_file' not in request.files or not request.files['pptx_file'].filename:
+            return jsonify({"error": "Please upload a PPTX file"}), 400
+
+        pptx_file = request.files['pptx_file']
+        uid = str(uuid.uuid4())[:8]
+        upload_path = UPLOAD_DIR / f"split_{uid}.pptx"
+        pptx_file.save(str(upload_path))
+
+        original_slides = extract_slides_from_pptx(str(upload_path))
+        if not original_slides:
+            return jsonify({"error": "Could not extract content from file"}), 400
+
+        font_style = request.form.get('font_style', 'aptos')
+        client_name = request.form.get('client_name', '').strip() or 'Presentation'
+        company_name = request.form.get('company_name', '').strip()
+
+        logo_path = None
+        colors = default_colors()
+        if 'logo' in request.files and request.files['logo'].filename:
+            logo_file = request.files['logo']
+            logo_ext = Path(logo_file.filename).suffix.lower()
+            if logo_ext in ('.png', '.jpg', '.jpeg', '.webp', '.svg'):
+                lid = str(uuid.uuid4())[:8]
+                logo_path = UPLOAD_DIR / f"logo_{lid}{logo_ext}"
+                logo_file.save(str(logo_path))
+                if logo_ext != '.svg':
+                    colors = extract_colors_from_logo(str(logo_path))
+        colors, logo_path, font_style = apply_brand(colors, logo_path, font_style)
+
+        # Generate executive summary (short) + appendix (detailed)
+        results = []
+
+        # Part 1: Executive Summary
+        summary_prompt = "Extract only the most critical content. Create a tight 6-slide executive summary: title, key takeaway, 2-3 main points with stats/visuals, recommendation, closing. Be ruthlessly concise."
+        summary_slides = polish_slide_content(original_slides, summary_prompt, num_slides=6, tone="Corporate")
+        summary_path = create_pptx(summary_slides, colors, client_name, company_name,
+                                   'Executive Summary', 'Corporate', logo_path, font_style)
+        results.append({
+            "part": "Executive Summary",
+            "download_url": f"/api/download/{Path(summary_path).name}",
+            "filename": f"{client_name.replace(' ', '_')}_Summary.pptx",
+            "slides_count": len(summary_slides)
+        })
+
+        # Part 2: Full Detail / Appendix
+        detail_prompt = "Expand all supporting details into a comprehensive appendix deck. Include all data, processes, timelines, team info, and supporting evidence. This is the deep-dive version."
+        detail_slides = polish_slide_content(original_slides, detail_prompt,
+                                            num_slides=max(len(original_slides), 12), tone="Corporate")
+        detail_path = create_pptx(detail_slides, colors, client_name, company_name,
+                                  'Full Detail', 'Corporate', logo_path, font_style)
+        results.append({
+            "part": "Full Detail + Appendix",
+            "download_url": f"/api/download/{Path(detail_path).name}",
+            "filename": f"{client_name.replace(' ', '_')}_Detail.pptx",
+            "slides_count": len(detail_slides)
+        })
+
+        log_usage(title=f"Split: {client_name}", slides=len(summary_slides) + len(detail_slides))
+
+        return jsonify({"success": True, "parts": results, "original_slides": len(original_slides)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -562,12 +1043,12 @@ a{text-decoration:none;color:inherit}
 <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--accent);margin-bottom:12px;text-align:center">Features</div>
 <div style="font-size:28px;font-weight:800;color:#fff;text-align:center;margin-bottom:36px">Professional decks without the design work</div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">🤖</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">AI Slide Generation</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Describe your project in plain English. AI creates title slides, content layouts, timelines, comparison tables, and closing slides.</div></div>
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">🎨</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Smart Color Themes</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Upload your logo — AI extracts brand colors automatically. Or choose from presets: corporate blue, startup green, creative purple, bold red.</div></div>
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">📐</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">10+ Slide Layouts</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Title, content, bullet points, timelines, comparisons, pricing tables, team bios, checklists, infographics, and closing slides.</div></div>
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">📊</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Visual Data Slides</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Timelines, comparison tables, metric cards, and infographic layouts — AI picks the right visual for your content.</div></div>
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">📥</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Download as .pptx</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Get a real PowerPoint file you can edit in PowerPoint, Google Slides, or Keynote. No vendor lock-in.</div></div>
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">✨</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Polish Existing Decks</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Upload any .pptx file and tell the AI what to change — improve tone, restructure slides, add visuals, make it investor-ready.</div></div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">🤖</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">AI Slide Generation</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Describe your project — AI creates 15+ layout types: timelines, stats, comparisons, icon grids, pricing tables, and more.</div></div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">✨</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Polish Existing Decks</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Upload any .pptx — AI improves tone, restructures slides, adds visuals. Quick presets: Make Concise, Investor-Ready, Executive Summary.</div></div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">👥</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Audience Versioning</div><div style="font-size:13px;color:var(--text2);line-height:1.6">One deck, three versions: 6-slide exec summary, 14-slide team detail, and 10-slide investor pitch — generated simultaneously.</div></div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">🎭</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Style Transfer</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Upload a reference deck you love + your content deck. AI copies the style, structure, and rhythm while keeping your data.</div></div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">🔗</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Merge & Split</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Combine slides from multiple team members into one cohesive deck. Or split a monster deck into an exec summary + appendix.</div></div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">🎨</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Brand-Locked Output</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Save your logo once — every deck comes out in your exact brand colors and fonts. Consistent branding across all presentations.</div></div>
 </div>
 </section>
 
@@ -748,9 +1229,12 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 </div>
 <p class="subtitle">Create new presentations or polish existing ones with AI</p>
 
-<div style="display:flex;gap:0;margin-bottom:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;max-width:400px">
-<button onclick="switchMode('create')" id="tabCreate" style="flex:1;padding:10px 20px;border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff">⚡ Create New</button>
-<button onclick="switchMode('polish')" id="tabPolish" style="flex:1;padding:10px 20px;border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;background:transparent;color:var(--text2)">✨ Polish Existing</button>
+<div style="display:flex;gap:0;margin-bottom:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;flex-wrap:wrap">
+<button onclick="switchMode('create')" id="tabCreate" class="modetab active" style="flex:1;min-width:100px;padding:10px 14px;border:none;border-radius:10px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff">⚡ Create</button>
+<button onclick="switchMode('polish')" id="tabPolish" class="modetab" style="flex:1;min-width:100px;padding:10px 14px;border:none;border-radius:10px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;background:transparent;color:var(--text2)">✨ Polish</button>
+<button onclick="switchMode('version')" id="tabVersion" class="modetab" style="flex:1;min-width:100px;padding:10px 14px;border:none;border-radius:10px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;background:transparent;color:var(--text2)">👥 Versions</button>
+<button onclick="switchMode('style')" id="tabStyle" class="modetab" style="flex:1;min-width:100px;padding:10px 14px;border:none;border-radius:10px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;background:transparent;color:var(--text2)">🎭 Style Transfer</button>
+<button onclick="switchMode('merge')" id="tabMerge" class="modetab" style="flex:1;min-width:100px;padding:10px 14px;border:none;border-radius:10px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;background:transparent;color:var(--text2)">🔗 Merge & Split</button>
 </div>
 
 <!-- ═══ CREATE MODE ═══ -->
@@ -926,6 +1410,136 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <div class="status" id="polishStatus"></div>
 </div>
 
+<!-- ═══ AUDIENCE VERSIONS MODE ═══ -->
+<div id="modeVersion" style="display:none">
+<div class="card">
+<h3>📤 Upload Your Deck</h3>
+<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Upload one deck and get 3 tailored versions — for executives, team, and investors.</p>
+<div class="file-upload" id="versionDropzone" onclick="document.getElementById('versionInput').click()">
+<input type="file" id="versionInput" accept=".pptx" onchange="handleFileUpload(this,'versionDropzone','versionText')">
+<div id="versionText">📎 Click to upload your PPTX file</div>
+</div>
+</div>
+
+<div class="card">
+<h3>👥 Select Audience Versions</h3>
+<p style="color:var(--text2);font-size:13px;margin-bottom:14px">Each version restructures your content for a different audience.</p>
+<div style="display:flex;flex-direction:column;gap:10px">
+<label style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px">
+<input type="checkbox" id="vExec" checked style="margin-top:2px"> <div><strong style="color:#fff">👔 Executive Summary</strong><br><span style="color:var(--text2)">6 slides max. Lead with conclusion. Stats over bullets. Answerable in 3 minutes.</span></div></label>
+<label style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px">
+<input type="checkbox" id="vDetailed" checked style="margin-top:2px"> <div><strong style="color:#fff">📋 Detailed (Team)</strong><br><span style="color:var(--text2)">12-16 slides. Full context, process flows, timelines, and supporting data.</span></div></label>
+<label style="display:flex;align-items:flex-start;gap:10px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px">
+<input type="checkbox" id="vInvestor" checked style="margin-top:2px"> <div><strong style="color:#fff">💰 Investor Pitch</strong><br><span style="color:var(--text2)">8-10 slides. Problem → Solution → Market → Traction → Ask. Numbers prominent.</span></div></label>
+</div>
+</div>
+
+<div class="card">
+<h3>🎨 Settings</h3>
+<div class="row">
+<div><label>Deck Name</label><input type="text" id="vClientName" placeholder="e.g. Q4 Strategy Review"></div>
+<div><label>Company Name</label><input type="text" id="vCompanyName" placeholder="e.g. Shakty.AI"></div>
+</div>
+<div class="row" style="margin-top:14px">
+<div><label>Font Style</label><select id="vFontStyle"><option value="aptos">Aptos · Clean Modern</option><option value="georgia">Georgia + Calibri · Classic</option><option value="arial">Arial Black · Bold</option><option value="trebuchet">Trebuchet · Creative</option><option value="palatino">Palatino · Elegant</option><option value="cambria">Cambria · Traditional</option></select></div>
+<div><label>Logo (optional)</label><div class="file-upload" style="padding:10px" onclick="document.getElementById('vLogoInput').click()"><input type="file" id="vLogoInput" accept=".png,.jpg,.jpeg,.webp,.svg" onchange="this.parentElement.querySelector('div').textContent='✓ '+this.files[0].name"><div style="font-size:12px">📎 Upload logo</div></div></div>
+</div>
+</div>
+
+<button class="btn btn-primary" id="versionBtn" onclick="generateVersions()">
+👥 Generate All Versions
+</button>
+<div class="status" id="versionStatus"></div>
+</div>
+
+<!-- ═══ STYLE TRANSFER MODE ═══ -->
+<div id="modeStyle" style="display:none">
+<div class="card">
+<h3>📄 Your Content Deck</h3>
+<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Upload the deck with the content you want to keep.</p>
+<div class="file-upload" id="contentDropzone" onclick="document.getElementById('contentInput').click()">
+<input type="file" id="contentInput" accept=".pptx" onchange="handleFileUpload(this,'contentDropzone','contentText')">
+<div id="contentText">📎 Upload your content PPTX</div>
+</div>
+</div>
+
+<div class="card">
+<h3>🎭 Reference / Style Deck</h3>
+<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Upload a deck whose style you want to copy — structure, tone, rhythm, level of detail.</p>
+<div class="file-upload" id="refDropzone" onclick="document.getElementById('refInput').click()">
+<input type="file" id="refInput" accept=".pptx" onchange="handleFileUpload(this,'refDropzone','refText')">
+<div id="refText">📎 Upload reference/style PPTX</div>
+</div>
+</div>
+
+<div class="card">
+<h3>✏️ Additional Instructions (optional)</h3>
+<textarea id="styleInstructions" rows="3" placeholder="e.g. Match the McKinsey style but keep our data. Make it more visual."></textarea>
+</div>
+
+<div class="card">
+<h3>🎨 Settings</h3>
+<div class="row">
+<div><label>Deck Name</label><input type="text" id="sClientName" placeholder="e.g. Strategy Proposal"></div>
+<div><label>Company Name</label><input type="text" id="sCompanyName" placeholder="e.g. Shakty.AI"></div>
+</div>
+<div class="row" style="margin-top:14px">
+<div><label>Font Style</label><select id="sFontStyle"><option value="aptos">Aptos · Clean Modern</option><option value="georgia">Georgia + Calibri · Classic</option><option value="arial">Arial Black · Bold</option><option value="trebuchet">Trebuchet · Creative</option><option value="palatino">Palatino · Elegant</option><option value="cambria">Cambria · Traditional</option></select></div>
+<div><label>Logo (optional)</label><div class="file-upload" style="padding:10px" onclick="document.getElementById('sLogoInput').click()"><input type="file" id="sLogoInput" accept=".png,.jpg,.jpeg,.webp,.svg" onchange="this.parentElement.querySelector('div').textContent='✓ '+this.files[0].name"><div style="font-size:12px">📎 Upload logo</div></div></div>
+</div>
+</div>
+
+<button class="btn btn-primary" id="styleBtn" onclick="doStyleTransfer()">
+🎭 Apply Style Transfer
+</button>
+<div class="status" id="styleStatus"></div>
+</div>
+
+<!-- ═══ MERGE & SPLIT MODE ═══ -->
+<div id="modeMerge" style="display:none">
+<div class="card">
+<h3>🔗 Merge Multiple Decks</h3>
+<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Upload 2+ PPTX files — AI will combine them into one cohesive presentation.</p>
+<div class="file-upload" id="mergeDropzone" onclick="document.getElementById('mergeInput').click()">
+<input type="file" id="mergeInput" accept=".pptx" multiple onchange="handleMultiFile(this)">
+<div id="mergeText">📎 Click to upload multiple PPTX files</div>
+</div>
+<div style="margin-top:12px"><label>Merge Instructions (optional)</label>
+<textarea id="mergeInstructions" rows="2" placeholder="e.g. Combine into a single narrative. Remove duplicates. Prioritize team A's data slides."></textarea></div>
+</div>
+
+<div class="card">
+<h3>✂️ Split a Deck</h3>
+<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Upload one large deck — get an Executive Summary + Full Detail version.</p>
+<div class="file-upload" id="splitDropzone" onclick="document.getElementById('splitInput').click()">
+<input type="file" id="splitInput" accept=".pptx" onchange="handleFileUpload(this,'splitDropzone','splitText')">
+<div id="splitText">📎 Upload PPTX to split</div>
+</div>
+</div>
+
+<div class="card">
+<h3>🎨 Settings</h3>
+<div class="row">
+<div><label>Deck Name</label><input type="text" id="mClientName" placeholder="e.g. Q4 Report"></div>
+<div><label>Company Name</label><input type="text" id="mCompanyName" placeholder="e.g. Shakty.AI"></div>
+</div>
+<div class="row" style="margin-top:14px">
+<div><label>Font Style</label><select id="mFontStyle"><option value="aptos">Aptos · Clean Modern</option><option value="georgia">Georgia + Calibri · Classic</option><option value="arial">Arial Black · Bold</option><option value="trebuchet">Trebuchet · Creative</option><option value="palatino">Palatino · Elegant</option><option value="cambria">Cambria · Traditional</option></select></div>
+<div><label>Tone</label><select id="mTone"><option>Corporate</option><option>Creative</option><option>Minimal</option><option>Bold</option><option>Friendly</option></select></div>
+</div>
+</div>
+
+<div style="display:flex;gap:12px;flex-wrap:wrap">
+<button class="btn btn-primary" id="mergeBtn" onclick="doMerge()" style="flex:1;min-width:200px">
+🔗 Merge Decks
+</button>
+<button class="btn btn-primary" id="splitBtn" onclick="doSplit()" style="flex:1;min-width:200px">
+✂️ Split Deck
+</button>
+</div>
+<div class="status" id="mergeStatus"></div>
+</div>
+
 <div class="footer">
 ProposalSnap · Built with Claude AI · Powered by Shakty.AI
 </div>
@@ -1062,13 +1676,34 @@ function showStatus(msg, type, targetId) {
 }
 
 // ── Mode Switcher ──
+const modes = ['create','polish','version','style','merge'];
+const modeIds = {create:'modeCreate',polish:'modePolish',version:'modeVersion',style:'modeStyle',merge:'modeMerge'};
+const tabIds = {create:'tabCreate',polish:'tabPolish',version:'tabVersion',style:'tabStyle',merge:'tabMerge'};
+
 function switchMode(mode) {
-  document.getElementById('modeCreate').style.display = mode === 'create' ? 'block' : 'none';
-  document.getElementById('modePolish').style.display = mode === 'polish' ? 'block' : 'none';
-  document.getElementById('tabCreate').style.background = mode === 'create' ? 'linear-gradient(135deg,#6C5CE7,#5A4BD1)' : 'transparent';
-  document.getElementById('tabCreate').style.color = mode === 'create' ? '#fff' : '#8B8FA3';
-  document.getElementById('tabPolish').style.background = mode === 'polish' ? 'linear-gradient(135deg,#6C5CE7,#5A4BD1)' : 'transparent';
-  document.getElementById('tabPolish').style.color = mode === 'polish' ? '#fff' : '#8B8FA3';
+  modes.forEach(m => {
+    document.getElementById(modeIds[m]).style.display = m === mode ? 'block' : 'none';
+    document.getElementById(tabIds[m]).style.background = m === mode ? 'linear-gradient(135deg,#6C5CE7,#5A4BD1)' : 'transparent';
+    document.getElementById(tabIds[m]).style.color = m === mode ? '#fff' : '#8B8FA3';
+  });
+}
+
+// ── Shared Helpers ──
+function handleFileUpload(input, dropzoneId, textId) {
+  if (!input.files.length) return;
+  document.getElementById(textId).textContent = '✓ ' + input.files[0].name;
+  document.getElementById(dropzoneId).classList.add('has-file');
+}
+
+function handleMultiFile(input) {
+  if (!input.files.length) return;
+  const names = Array.from(input.files).map(f => f.name).join(', ');
+  document.getElementById('mergeText').textContent = '✓ ' + input.files.length + ' files: ' + names;
+  document.getElementById('mergeDropzone').classList.add('has-file');
+}
+
+function makeDownloadLink(url, fname) {
+  return '<a href="' + url + '?name=' + encodeURIComponent(fname) + '" class="download-btn">📥 ' + fname + '</a>';
 }
 
 // ── Polish Mode ──
@@ -1079,8 +1714,7 @@ polishInstEl.addEventListener('input', () => {
 
 function handlePptx(input) {
   if (!input.files.length) return;
-  const file = input.files[0];
-  document.getElementById('pptxText').textContent = '✓ ' + file.name;
+  document.getElementById('pptxText').textContent = '✓ ' + input.files[0].name;
   document.getElementById('pptxDropzone').classList.add('has-file');
 }
 
@@ -1103,7 +1737,6 @@ function fillPolishExample(type) {
 async function polishDeck() {
   const pptxInput = document.getElementById('pptxInput');
   const instructions = polishInstEl.value.trim();
-
   if (!pptxInput.files.length) { showStatus('Please upload a PPTX file', 'error', 'polishStatus'); return; }
   if (!instructions) { showStatus('Please enter polishing instructions', 'error', 'polishStatus'); return; }
 
@@ -1120,29 +1753,168 @@ async function polishDeck() {
   formData.append('num_slides', document.getElementById('polishNumSlides').value);
   formData.append('client_name', document.getElementById('polishClientName').value.trim());
   formData.append('company_name', document.getElementById('polishCompanyName').value.trim());
-
   const logoInput = document.getElementById('polishLogoInput');
   if (logoInput.files.length) formData.append('logo', logoInput.files[0]);
 
   try {
     const res = await fetch('/api/polish', { method: 'POST', body: formData });
     const data = await res.json();
-
     if (data.success) {
-      const downloadUrl = data.download_url + '?name=' + encodeURIComponent(data.filename);
-      showStatus(
-        '<div>✅ Deck polished! ' + data.original_slides + ' slides extracted → ' + data.slides_count + ' slides generated.</div>' +
-        '<a href="' + downloadUrl + '" class="download-btn">📥 Download ' + data.filename + '</a>',
-        'success', 'polishStatus');
+      showStatus('<div>✅ Deck polished! ' + data.original_slides + ' slides → ' + data.slides_count + ' slides.</div>' +
+        makeDownloadLink(data.download_url, data.filename), 'success', 'polishStatus');
     } else {
-      showStatus('❌ ' + (data.error || 'Failed to polish'), 'error', 'polishStatus');
+      showStatus('❌ ' + (data.error || 'Failed'), 'error', 'polishStatus');
     }
-  } catch(e) {
-    showStatus('❌ Connection error: ' + e.message, 'error', 'polishStatus');
-  }
-
+  } catch(e) { showStatus('❌ ' + e.message, 'error', 'polishStatus'); }
   btn.disabled = false;
   btn.innerHTML = '✨ Polish Presentation';
+}
+
+// ── Audience Versions ──
+async function generateVersions() {
+  const input = document.getElementById('versionInput');
+  if (!input.files.length) { showStatus('Please upload a PPTX file', 'error', 'versionStatus'); return; }
+
+  const audiences = [];
+  if (document.getElementById('vExec').checked) audiences.push('executive');
+  if (document.getElementById('vDetailed').checked) audiences.push('detailed');
+  if (document.getElementById('vInvestor').checked) audiences.push('investor');
+  if (!audiences.length) { showStatus('Select at least one audience', 'error', 'versionStatus'); return; }
+
+  const btn = document.getElementById('versionBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating ' + audiences.length + ' versions...';
+  showStatus('🤖 Creating ' + audiences.length + ' audience versions... This takes 30-60 seconds.', 'loading', 'versionStatus');
+
+  const formData = new FormData();
+  formData.append('pptx_file', input.files[0]);
+  audiences.forEach(a => formData.append('audiences', a));
+  formData.append('client_name', document.getElementById('vClientName').value.trim());
+  formData.append('company_name', document.getElementById('vCompanyName').value.trim());
+  formData.append('font_style', document.getElementById('vFontStyle').value);
+  const logo = document.getElementById('vLogoInput');
+  if (logo.files.length) formData.append('logo', logo.files[0]);
+
+  try {
+    const res = await fetch('/api/version', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.success) {
+      let html = '<div>✅ ' + data.versions.length + ' versions created from ' + data.original_slides + ' original slides:</div>';
+      data.versions.forEach(v => {
+        if (v.error) {
+          html += '<div style="margin-top:8px;color:var(--red)">❌ ' + v.audience + ': ' + v.error + '</div>';
+        } else {
+          html += '<div style="margin-top:8px">' + makeDownloadLink(v.download_url, v.filename) + ' <span style="color:var(--text2);font-size:12px">' + v.slides_count + ' slides</span></div>';
+        }
+      });
+      showStatus(html, 'success', 'versionStatus');
+    } else {
+      showStatus('❌ ' + (data.error || 'Failed'), 'error', 'versionStatus');
+    }
+  } catch(e) { showStatus('❌ ' + e.message, 'error', 'versionStatus'); }
+  btn.disabled = false;
+  btn.innerHTML = '👥 Generate All Versions';
+}
+
+// ── Style Transfer ──
+async function doStyleTransfer() {
+  const contentInput = document.getElementById('contentInput');
+  const refInput = document.getElementById('refInput');
+  if (!contentInput.files.length) { showStatus('Please upload your content deck', 'error', 'styleStatus'); return; }
+  if (!refInput.files.length) { showStatus('Please upload a reference/style deck', 'error', 'styleStatus'); return; }
+
+  const btn = document.getElementById('styleBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Applying style...';
+  showStatus('🤖 Analyzing reference style and restyling your content... 20-40 seconds.', 'loading', 'styleStatus');
+
+  const formData = new FormData();
+  formData.append('content_file', contentInput.files[0]);
+  formData.append('reference_file', refInput.files[0]);
+  formData.append('instructions', document.getElementById('styleInstructions').value.trim());
+  formData.append('client_name', document.getElementById('sClientName').value.trim());
+  formData.append('company_name', document.getElementById('sCompanyName').value.trim());
+  formData.append('font_style', document.getElementById('sFontStyle').value);
+  const logo = document.getElementById('sLogoInput');
+  if (logo.files.length) formData.append('logo', logo.files[0]);
+
+  try {
+    const res = await fetch('/api/style-transfer', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.success) {
+      showStatus('<div>✅ Style applied! ' + data.content_slides + ' content slides restyled using ' + data.reference_slides + '-slide reference → ' + data.slides_count + ' slides.</div>' +
+        makeDownloadLink(data.download_url, data.filename), 'success', 'styleStatus');
+    } else {
+      showStatus('❌ ' + (data.error || 'Failed'), 'error', 'styleStatus');
+    }
+  } catch(e) { showStatus('❌ ' + e.message, 'error', 'styleStatus'); }
+  btn.disabled = false;
+  btn.innerHTML = '🎭 Apply Style Transfer';
+}
+
+// ── Merge ──
+async function doMerge() {
+  const input = document.getElementById('mergeInput');
+  if (!input.files.length || input.files.length < 2) { showStatus('Please upload at least 2 PPTX files', 'error', 'mergeStatus'); return; }
+
+  const btn = document.getElementById('mergeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Merging...';
+  showStatus('🤖 Merging ' + input.files.length + ' decks... 20-40 seconds.', 'loading', 'mergeStatus');
+
+  const formData = new FormData();
+  Array.from(input.files).forEach(f => formData.append('pptx_files', f));
+  formData.append('instructions', document.getElementById('mergeInstructions').value.trim());
+  formData.append('client_name', document.getElementById('mClientName').value.trim());
+  formData.append('company_name', document.getElementById('mCompanyName').value.trim());
+  formData.append('font_style', document.getElementById('mFontStyle').value);
+  formData.append('tone', document.getElementById('mTone').value);
+
+  try {
+    const res = await fetch('/api/merge', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.success) {
+      showStatus('<div>✅ Merged! ' + data.source_files + ' files (' + data.source_slides + ' slides) → ' + data.slides_count + ' cohesive slides.</div>' +
+        makeDownloadLink(data.download_url, data.filename), 'success', 'mergeStatus');
+    } else {
+      showStatus('❌ ' + (data.error || 'Failed'), 'error', 'mergeStatus');
+    }
+  } catch(e) { showStatus('❌ ' + e.message, 'error', 'mergeStatus'); }
+  btn.disabled = false;
+  btn.innerHTML = '🔗 Merge Decks';
+}
+
+// ── Split ──
+async function doSplit() {
+  const input = document.getElementById('splitInput');
+  if (!input.files.length) { showStatus('Please upload a PPTX file to split', 'error', 'mergeStatus'); return; }
+
+  const btn = document.getElementById('splitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Splitting...';
+  showStatus('🤖 Creating Executive Summary + Full Detail versions... 30-50 seconds.', 'loading', 'mergeStatus');
+
+  const formData = new FormData();
+  formData.append('pptx_file', input.files[0]);
+  formData.append('client_name', document.getElementById('mClientName').value.trim());
+  formData.append('company_name', document.getElementById('mCompanyName').value.trim());
+  formData.append('font_style', document.getElementById('mFontStyle').value);
+
+  try {
+    const res = await fetch('/api/split', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.success) {
+      let html = '<div>✅ Split! ' + data.original_slides + ' original slides into 2 versions:</div>';
+      data.parts.forEach(p => {
+        html += '<div style="margin-top:8px">' + makeDownloadLink(p.download_url, p.filename) + ' <span style="color:var(--text2);font-size:12px">' + p.part + ' · ' + p.slides_count + ' slides</span></div>';
+      });
+      showStatus(html, 'success', 'mergeStatus');
+    } else {
+      showStatus('❌ ' + (data.error || 'Failed'), 'error', 'mergeStatus');
+    }
+  } catch(e) { showStatus('❌ ' + e.message, 'error', 'mergeStatus'); }
+  btn.disabled = false;
+  btn.innerHTML = '✂️ Split Deck';
 }
 </script>
 </body></html>"""
