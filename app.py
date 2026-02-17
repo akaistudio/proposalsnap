@@ -15,6 +15,8 @@ import psycopg2
 import psycopg2.extras
 import requests as http_requests
 from PIL import Image
+from pptx import Presentation as PptxPresentation
+from pptx.util import Inches, Pt
 from flask import Flask, request, jsonify, send_file, render_template_string, redirect, session, flash
 
 app = Flask(__name__)
@@ -241,6 +243,90 @@ Generate exactly {num_slides} slides."""
         text = text.rsplit("```", 1)[0]
     return json.loads(text)
 
+# ── Extract slides from uploaded PPTX ──────────────────────────
+def extract_slides_from_pptx(filepath):
+    """Extract text content from each slide of an uploaded PPTX"""
+    prs = PptxPresentation(filepath)
+    slides = []
+    for i, slide in enumerate(prs.slides):
+        slide_data = {"slide_number": i + 1, "texts": []}
+        for shape in slide.shapes:
+            if shape.has_text_frame:
+                for para in shape.text_frame.paragraphs:
+                    text = para.text.strip()
+                    if text:
+                        slide_data["texts"].append(text)
+            if shape.has_table:
+                table = shape.table
+                rows = []
+                for row in table.rows:
+                    cells = [cell.text.strip() for cell in row.cells]
+                    rows.append(cells)
+                slide_data["table"] = rows
+        if slide_data["texts"] or slide_data.get("table"):
+            slides.append(slide_data)
+    return slides
+
+def polish_slide_content(original_slides, instructions, num_slides=None, tone="Corporate"):
+    """Use Claude to polish/improve existing slide content"""
+    slides_text = json.dumps(original_slides, indent=2)
+    if num_slides is None:
+        num_slides = len(original_slides)
+
+    prompt = f"""You are a presentation expert. I have an existing presentation with the following slide content:
+
+{slides_text}
+
+USER'S INSTRUCTIONS FOR POLISHING:
+{instructions}
+
+Take the existing content and POLISH it according to the user's instructions.
+
+Return ONLY a valid JSON array of slide objects. Each slide MUST have these fields:
+- "layout": one of the layouts below
+- "title": slide title
+- Additional fields based on layout:
+
+AVAILABLE LAYOUTS:
+
+"title": Opening slide. Fields: subtitle (string)
+"agenda": Overview of what's covered. Fields: bullets (array of 5-7 strings)
+"content": Standard text slide. Fields: bullets (array of 3-5 strings) OR body (paragraph), optional subtitle
+"two_column": Side-by-side comparison. Fields: left_title, left_bullets (array), right_title, right_bullets (array)
+"stats": Big number metrics (2-4 cards). Fields: stats (array of {{value, label, description}})
+"timeline": Process/timeline steps. Fields: steps (array of {{phase, description, duration}})
+"pricing": Investment/tier cards. Fields: tiers (array of {{name, price, features[], highlight bool}})
+"team": Team member cards. Fields: members (array of {{name, role, bio}})
+"icon_grid": 4-6 feature/service cards with icons. Fields: items (array of {{icon, heading, description}}). icon should be a single emoji.
+"comparison": Before vs After or comparison table. Fields: left_label, right_label, rows (array of {{feature, left_value, right_value}})
+"quote": Testimonial or key statement. Fields: quote (string), attribution (string), role (string)
+"metric_bar": Horizontal progress bars. Fields: metrics (array of {{label, value, max_value, description}}). value and max_value are numbers.
+"process_flow": Numbered process with arrows. Fields: steps (array of {{number, title, description}})
+"checklist": Visual checklist/deliverables. Fields: items (array of strings), subtitle (string)
+"big_statement": One powerful sentence in large text. Fields: statement (string), supporting_text (string)
+"closing": Thank you slide. Fields: subtitle, contact (string)
+
+RULES:
+1. PRESERVE the original content and meaning — polish, don't rewrite from scratch
+2. Apply the user's specific instructions (tone changes, additions, restructuring, etc.)
+3. Use visual layouts (stats, icon_grid, comparison, timeline) where the content fits
+4. First slide should be "title", last should be "closing"
+5. Use at least 5 different layout types for visual variety
+6. Keep bullets concise (10-20 words each)
+7. Generate exactly {num_slides} slides
+8. Tone: {tone}
+9. Return ONLY the JSON array, no other text"""
+
+    response = client.messages.create(
+        model=MODEL, max_tokens=4000,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    text = response.content[0].text.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        text = text.rsplit("```", 1)[0]
+    return json.loads(text)
+
 # ── PPTX Generation ───────────────────────────────────────────
 def create_pptx(slides, colors, client_name, company_name, pres_type, tone, logo_path=None, font_style='aptos'):
     """Generate PPTX using Node.js pptxgenjs"""
@@ -335,6 +421,80 @@ def generate():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/polish', methods=['POST'])
+def polish():
+    try:
+        instructions = request.form.get('instructions', '').strip()
+        tone = request.form.get('tone', 'Corporate')
+        font_style = request.form.get('font_style', 'aptos')
+        num_slides = request.form.get('num_slides', '')
+
+        if not instructions:
+            return jsonify({"error": "Please provide polishing instructions"}), 400
+
+        if 'pptx_file' not in request.files or not request.files['pptx_file'].filename:
+            return jsonify({"error": "Please upload a PPTX file"}), 400
+
+        pptx_file = request.files['pptx_file']
+        if not pptx_file.filename.lower().endswith('.pptx'):
+            return jsonify({"error": "Only .pptx files are supported"}), 400
+
+        # Save uploaded file
+        upload_id = str(uuid.uuid4())[:8]
+        upload_path = UPLOAD_DIR / f"upload_{upload_id}.pptx"
+        pptx_file.save(str(upload_path))
+
+        # Extract content from uploaded slides
+        original_slides = extract_slides_from_pptx(str(upload_path))
+        if not original_slides:
+            return jsonify({"error": "Could not extract any content from the uploaded file"}), 400
+
+        # Determine slide count
+        slide_count = int(num_slides) if num_slides else len(original_slides)
+        slide_count = max(6, min(20, slide_count))
+
+        # Polish with AI
+        polished_slides = polish_slide_content(original_slides, instructions, slide_count, tone)
+
+        # Handle logo if provided
+        logo_path = None
+        colors = default_colors()
+        if 'logo' in request.files and request.files['logo'].filename:
+            logo_file = request.files['logo']
+            logo_ext = Path(logo_file.filename).suffix.lower()
+            if logo_ext in ('.png', '.jpg', '.jpeg', '.webp', '.svg'):
+                logo_id = str(uuid.uuid4())[:8]
+                logo_path = UPLOAD_DIR / f"logo_{logo_id}{logo_ext}"
+                logo_file.save(str(logo_path))
+                if logo_ext != '.svg':
+                    colors = extract_colors_from_logo(str(logo_path))
+
+        # Get client/company from first slide title or form
+        client_name = request.form.get('client_name', '').strip()
+        if not client_name and polished_slides:
+            client_name = polished_slides[0].get('title', 'Polished Deck')
+        company_name = request.form.get('company_name', '').strip()
+
+        # Generate polished PPTX
+        output_path = create_pptx(polished_slides, colors, client_name, company_name,
+                                  'Polished Presentation', tone, logo_path, font_style)
+
+        filename = f"Polished_{client_name.replace(' ', '_')}.pptx" if client_name else "Polished_Presentation.pptx"
+        log_usage(title=f"Polish: {client_name}", slides=len(polished_slides))
+
+        return jsonify({
+            "success": True,
+            "download_url": f"/api/download/{Path(output_path).name}",
+            "filename": filename,
+            "slides_count": len(polished_slides),
+            "original_slides": len(original_slides),
+            "colors": colors
+        })
+    except json.JSONDecodeError:
+        return jsonify({"error": "AI failed to generate valid slide structure. Please try again."}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/download/<filename>')
 def download(filename):
     filepath = OUTPUT_DIR / filename
@@ -387,7 +547,7 @@ a{text-decoration:none;color:inherit}
 <div style="max-width:700px;position:relative;z-index:1">
 <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(108,92,231,.1);border:1px solid rgba(108,92,231,.2);border-radius:20px;padding:6px 16px;font-size:12px;font-weight:700;color:var(--accent);margin-bottom:24px">✦ AI-Powered Presentations</div>
 <h1 style="font-size:clamp(32px,5vw,48px);font-weight:800;line-height:1.15;margin-bottom:16px;color:#fff">Describe your idea.<br><span style="background:linear-gradient(135deg,#6C5CE7,#00D2A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Get a pitch deck.</span></h1>
-<p style="font-size:17px;color:var(--text2);line-height:1.7;margin-bottom:28px;max-width:560px;margin:0 auto 28px">Type what your project is about — AI generates a professional PowerPoint with smart layouts, branded colors, and structured slides. Ready to present in 30 seconds.</p>
+<p style="font-size:17px;color:var(--text2);line-height:1.7;margin-bottom:28px;max-width:560px;margin:0 auto 28px">Create presentations from scratch or polish existing decks with AI. Smart layouts, branded colors, structured slides. Ready to present in 30 seconds.</p>
 <div>
 <a href="/create" class="btn-hero btn-fill">Create Presentation →</a>
 <a href="/login" class="btn-hero btn-outline">Sign In</a>
@@ -407,7 +567,7 @@ a{text-decoration:none;color:inherit}
 <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">📐</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">10+ Slide Layouts</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Title, content, bullet points, timelines, comparisons, pricing tables, team bios, checklists, infographics, and closing slides.</div></div>
 <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">📊</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Visual Data Slides</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Timelines, comparison tables, metric cards, and infographic layouts — AI picks the right visual for your content.</div></div>
 <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">📥</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Download as .pptx</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Get a real PowerPoint file you can edit in PowerPoint, Google Slides, or Keynote. No vendor lock-in.</div></div>
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">⚡</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">30-Second Turnaround</div><div style="font-size:13px;color:var(--text2);line-height:1.6">No templates to fill. No drag-and-drop. Just describe what you want and get a complete deck in under a minute.</div></div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">✨</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Polish Existing Decks</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Upload any .pptx file and tell the AI what to change — improve tone, restructure slides, add visuals, make it investor-ready.</div></div>
 </div>
 </section>
 
@@ -586,8 +746,15 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 
 <div style="position:relative;display:inline-block"><button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'" style="font-size:14px;background:none;border:1px solid #2A3148;border-radius:6px;padding:5px 10px;color:#8B95B0;cursor:pointer;font-family:'DM Sans',sans-serif" title="Switch App">⊞</button><div style="display:none;position:absolute;right:0;top:32px;background:#141926;border:1px solid #2A3148;border-radius:10px;padding:8px;min-width:180px;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,.5)"><a href="https://invoicesnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📄 InvoiceSnap</a><a href="https://contractsnap-app.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📋 ContractSnap</a><a href="https://expensesnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📸 ExpenseSnap</a><a href="https://payslipsnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">💰 PayslipSnap</a></div></div>
 </div>
-<p class="subtitle">Fill in the details below and generate your deck</p>
+<p class="subtitle">Create new presentations or polish existing ones with AI</p>
 
+<div style="display:flex;gap:0;margin-bottom:24px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;max-width:400px">
+<button onclick="switchMode('create')" id="tabCreate" style="flex:1;padding:10px 20px;border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff">⚡ Create New</button>
+<button onclick="switchMode('polish')" id="tabPolish" style="flex:1;padding:10px 20px;border:none;border-radius:10px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;background:transparent;color:var(--text2)">✨ Polish Existing</button>
+</div>
+
+<!-- ═══ CREATE MODE ═══ -->
+<div id="modeCreate">
 <div class="card">
 <h3>📋 Presentation Details</h3>
 <div class="row" style="margin-bottom:16px">
@@ -675,6 +842,89 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 </button>
 
 <div class="status" id="status"></div>
+</div>
+
+<!-- ═══ POLISH MODE ═══ -->
+<div id="modePolish" style="display:none">
+<div class="card">
+<h3>📤 Upload Your Deck</h3>
+<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Upload an existing .pptx file — AI will extract the content and polish it based on your instructions.</p>
+<div class="file-upload" id="pptxDropzone" onclick="document.getElementById('pptxInput').click()">
+<input type="file" id="pptxInput" accept=".pptx" onchange="handlePptx(this)">
+<div id="pptxText">📎 Click to upload your PPTX file</div>
+</div>
+</div>
+
+<div class="card">
+<h3>✏️ Polishing Instructions *</h3>
+<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Tell the AI what to improve, restructure, or change. Be specific for best results.</p>
+<textarea id="polishInstructions" placeholder="Examples:
+- Make it more concise and executive-friendly
+- Add a timeline slide and a pricing comparison
+- Change the tone to be more persuasive for investors
+- Improve the visuals — use more charts and stats
+- Restructure: combine slides 3 & 4, expand the ROI section
+- Add a team slide and a competitive advantage comparison
+- Make all bullets more action-oriented"></textarea>
+<div class="counter"><span id="polishCharCount">0</span> characters</div>
+<div class="examples">
+<span class="example-tag" onclick="fillPolishExample('concise')">✂️ Make Concise</span>
+<span class="example-tag" onclick="fillPolishExample('visual')">📊 More Visual</span>
+<span class="example-tag" onclick="fillPolishExample('investor')">💰 Investor-Ready</span>
+<span class="example-tag" onclick="fillPolishExample('executive')">👔 Executive Summary</span>
+</div>
+</div>
+
+<div class="card">
+<h3>🎨 Tone & Style</h3>
+<div class="row" style="margin-bottom:16px">
+<div><label>Client / Deck Name</label>
+<input type="text" id="polishClientName" placeholder="e.g. Q4 Strategy Review"></div>
+<div><label>Company Name</label>
+<input type="text" id="polishCompanyName" placeholder="e.g. Shakty.AI"></div>
+</div>
+<div class="row3">
+<div><label>Tone</label>
+<select id="polishTone">
+<option>Corporate</option>
+<option>Creative</option>
+<option>Minimal</option>
+<option>Bold</option>
+<option>Friendly</option>
+</select></div>
+<div><label>Font Style</label>
+<select id="polishFontStyle">
+<option value="aptos">Aptos · Clean Modern</option>
+<option value="georgia">Georgia + Calibri · Classic</option>
+<option value="arial">Arial Black + Arial · Bold</option>
+<option value="trebuchet">Trebuchet + Calibri · Creative</option>
+<option value="palatino">Palatino + Garamond · Elegant</option>
+<option value="cambria">Cambria + Calibri · Traditional</option>
+</select></div>
+<div><label>Output Slides</label>
+<select id="polishNumSlides">
+<option value="">Same as original</option>
+<option>6</option>
+<option>8</option>
+<option>10</option>
+<option>12</option>
+<option>14</option>
+<option>16</option>
+</select></div>
+<div><label>Logo (optional)</label>
+<div class="file-upload" style="padding:10px" onclick="document.getElementById('polishLogoInput').click()">
+<input type="file" id="polishLogoInput" accept=".png,.jpg,.jpeg,.webp,.svg" onchange="handlePolishLogo(this)">
+<div id="polishLogoText" style="font-size:12px">📎 Upload logo</div>
+</div></div>
+</div>
+</div>
+
+<button class="btn btn-primary" id="polishBtn" onclick="polishDeck()">
+✨ Polish Presentation
+</button>
+
+<div class="status" id="polishStatus"></div>
+</div>
 
 <div class="footer">
 ProposalSnap · Built with Claude AI · Powered by Shakty.AI
@@ -805,10 +1055,94 @@ async function generate() {
   btn.innerHTML = '⚡ Generate Presentation';
 }
 
-function showStatus(msg, type) {
-  const el = document.getElementById('status');
+function showStatus(msg, type, targetId) {
+  const el = document.getElementById(targetId || 'status');
   el.innerHTML = msg;
   el.className = 'status ' + type;
+}
+
+// ── Mode Switcher ──
+function switchMode(mode) {
+  document.getElementById('modeCreate').style.display = mode === 'create' ? 'block' : 'none';
+  document.getElementById('modePolish').style.display = mode === 'polish' ? 'block' : 'none';
+  document.getElementById('tabCreate').style.background = mode === 'create' ? 'linear-gradient(135deg,#6C5CE7,#5A4BD1)' : 'transparent';
+  document.getElementById('tabCreate').style.color = mode === 'create' ? '#fff' : '#8B8FA3';
+  document.getElementById('tabPolish').style.background = mode === 'polish' ? 'linear-gradient(135deg,#6C5CE7,#5A4BD1)' : 'transparent';
+  document.getElementById('tabPolish').style.color = mode === 'polish' ? '#fff' : '#8B8FA3';
+}
+
+// ── Polish Mode ──
+const polishInstEl = document.getElementById('polishInstructions');
+polishInstEl.addEventListener('input', () => {
+  document.getElementById('polishCharCount').textContent = polishInstEl.value.length;
+});
+
+function handlePptx(input) {
+  if (!input.files.length) return;
+  const file = input.files[0];
+  document.getElementById('pptxText').textContent = '✓ ' + file.name;
+  document.getElementById('pptxDropzone').classList.add('has-file');
+}
+
+function handlePolishLogo(input) {
+  if (!input.files.length) return;
+  document.getElementById('polishLogoText').textContent = '✓ ' + input.files[0].name;
+}
+
+function fillPolishExample(type) {
+  const examples = {
+    concise: "Make every slide more concise. Remove filler words. Keep bullets to 8-12 words max. Cut any redundant slides. Add a strong executive summary slide at the beginning.",
+    visual: "Convert text-heavy slides into visual layouts. Add a stats slide with key metrics. Include a timeline for milestones. Use comparison tables instead of long paragraphs. Add an icon grid for features/services.",
+    investor: "Restructure for investor pitch format: Problem → Solution → Market Size → Traction → Business Model → Team → Ask. Make numbers and metrics prominent. Add a competitive landscape comparison. End with a clear funding ask.",
+    executive: "Condense to 8 slides max. Lead with the conclusion/recommendation. Use stats and charts over bullets. Remove technical details. Make every slide answerable in under 30 seconds. Add a decision-ready closing slide."
+  };
+  polishInstEl.value = examples[type] || '';
+  document.getElementById('polishCharCount').textContent = polishInstEl.value.length;
+}
+
+async function polishDeck() {
+  const pptxInput = document.getElementById('pptxInput');
+  const instructions = polishInstEl.value.trim();
+
+  if (!pptxInput.files.length) { showStatus('Please upload a PPTX file', 'error', 'polishStatus'); return; }
+  if (!instructions) { showStatus('Please enter polishing instructions', 'error', 'polishStatus'); return; }
+
+  const btn = document.getElementById('polishBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Polishing your deck...';
+  showStatus('🤖 AI is reading your slides and applying changes... This takes 20-40 seconds.', 'loading', 'polishStatus');
+
+  const formData = new FormData();
+  formData.append('pptx_file', pptxInput.files[0]);
+  formData.append('instructions', instructions);
+  formData.append('tone', document.getElementById('polishTone').value);
+  formData.append('font_style', document.getElementById('polishFontStyle').value);
+  formData.append('num_slides', document.getElementById('polishNumSlides').value);
+  formData.append('client_name', document.getElementById('polishClientName').value.trim());
+  formData.append('company_name', document.getElementById('polishCompanyName').value.trim());
+
+  const logoInput = document.getElementById('polishLogoInput');
+  if (logoInput.files.length) formData.append('logo', logoInput.files[0]);
+
+  try {
+    const res = await fetch('/api/polish', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (data.success) {
+      const downloadUrl = data.download_url + '?name=' + encodeURIComponent(data.filename);
+      showStatus(
+        '<div>✅ Deck polished! ' + data.original_slides + ' slides extracted → ' + data.slides_count + ' slides generated.</div>' +
+        '<a href="' + downloadUrl + '" class="download-btn">📥 Download ' + data.filename + '</a>',
+        'success', 'polishStatus');
+    } else {
+      showStatus('❌ ' + (data.error || 'Failed to polish'), 'error', 'polishStatus');
+    }
+  } catch(e) {
+    showStatus('❌ Connection error: ' + e.message, 'error', 'polishStatus');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '✨ Polish Presentation';
 }
 </script>
 </body></html>"""
