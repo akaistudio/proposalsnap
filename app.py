@@ -283,7 +283,13 @@ LANDING_HTML = """<!DOCTYPE html>
 --radius:14px;--font:'Inter',sans-serif}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
-a{text-decoration:none}
+a{text-decoration:none;color:inherit}
+.btn-hero{display:inline-block;padding:14px 32px;border-radius:10px;font-size:15px;font-weight:700;margin:0 6px 8px;transition:all .2s;cursor:pointer}
+.btn-hero:hover{transform:translateY(-2px)}
+.btn-fill{background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff !important;box-shadow:0 4px 20px rgba(108,92,231,.2)}
+.btn-fill:hover{box-shadow:0 8px 30px rgba(108,92,231,.4)}
+.btn-outline{background:transparent;color:var(--text) !important;border:1.5px solid rgba(255,255,255,.15)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent) !important}
 </style>
 </head>
 <body>
@@ -294,9 +300,9 @@ a{text-decoration:none}
 <h1 style="font-size:clamp(32px,5vw,48px);font-weight:800;line-height:1.15;margin-bottom:16px;color:#fff">Describe your idea.<br><span style="background:linear-gradient(135deg,#6C5CE7,#00D2A0);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Get a pitch deck.</span></h1>
 <p style="font-size:17px;color:var(--text2);line-height:1.7;margin-bottom:28px;max-width:560px;margin:0 auto 28px">Type what your project is about — AI generates a professional PowerPoint with smart layouts, branded colors, and structured slides. Ready to present in 30 seconds.</p>
 <div>
-<a href="/create" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff;border-radius:10px;font-size:15px;font-weight:700;margin:0 6px 8px;transition:.2s">Create Presentation →</a>
-<a href="#features" style="display:inline-block;padding:14px 32px;background:transparent;color:var(--text);border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-weight:600;margin:0 6px 8px">See Features</a>
-<a href="/demo" style="display:inline-block;padding:14px 32px;background:transparent;color:var(--text);border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-weight:600;margin:0 6px 8px">View Demo Gallery</a>
+<a href="/create" class="btn-hero btn-fill">Create Presentation →</a>
+<a href="#features" class="btn-hero btn-outline">See Features</a>
+<a href="/demo" class="btn-hero btn-outline">View Demo Gallery</a>
 </div>
 </div>
 </section>
@@ -325,8 +331,8 @@ a{text-decoration:none}
 </section>
 
 <section style="padding:40px 24px 80px;text-align:center">
-<a href="/create" style="display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff;border-radius:12px;font-size:17px;font-weight:700;transition:.2s;box-shadow:0 4px 20px rgba(108,92,231,.3)">Create Your Presentation →</a>
-<div style="margin-top:20px;font-size:12px;color:var(--text2)">Part of <a href="https://snapsuite.up.railway.app" style="color:var(--accent2)">SnapSuite</a> — 6 apps for your entire business</div>
+<a href="/create" style="display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff !important;border-radius:12px;font-size:17px;font-weight:700;transition:.2s;box-shadow:0 4px 20px rgba(108,92,231,.3)">Create Your Presentation →</a>
+<div style="margin-top:20px;font-size:12px;color:var(--text2)">Part of <a href="https://snapsuite.up.railway.app" style="color:#A78BFA !important">SnapSuite</a> — 6 apps for your entire business</div>
 </section>
 </body></html>"""
 
