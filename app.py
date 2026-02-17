@@ -336,8 +336,9 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <body>
 <div class="container">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-<h1>ProposalSnap</h1>
+<a href="/" style="text-decoration:none;color:inherit"><h1>ProposalSnap</h1></a>
 <a href="https://snapsuite.up.railway.app" target="_blank" style="font-size:12px;color:#8B95B0;text-decoration:none;padding:6px 12px;border:1px solid #2A3148;border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">← SnapSuite</a>
+<div style="position:relative;display:inline-block"><button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'" style="font-size:14px;background:none;border:1px solid #2A3148;border-radius:6px;padding:5px 10px;color:#8B95B0;cursor:pointer;font-family:'DM Sans',sans-serif" title="Switch App">⊞</button><div style="display:none;position:absolute;right:0;top:32px;background:#141926;border:1px solid #2A3148;border-radius:10px;padding:8px;min-width:180px;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,.5)"><a href="https://invoicesnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📄 InvoiceSnap</a><a href="https://contractsnap-app.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📋 ContractSnap</a><a href="https://expensesnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📸 ExpenseSnap</a><a href="https://payslipsnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">💰 PayslipSnap</a></div></div>
 </div>
 <p class="subtitle">AI-powered professional presentations in seconds</p>
 
@@ -763,7 +764,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <body>
 
 <div class="topbar">
-    <h1>Proposal<span>Snap</span></h1>
+    <a href="/" style="text-decoration:none;color:inherit"><h1>Proposal<span>Snap</span></h1></a>
     <div class="topbar-right">
         <a href="{{ hub_url }}">← SnapSuite</a>
         <a href="/" class="cta">+ Create New Proposal</a>
