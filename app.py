@@ -627,7 +627,11 @@ function showStatus(msg, type) {
 </body></html>"""
 
 @app.route('/')
-def landing():
+def index():
+    return redirect('/welcome')
+
+@app.route('/welcome')
+def welcome():
     return render_template_string(LANDING_HTML)
 
 @app.route('/create')
