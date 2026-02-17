@@ -48,6 +48,7 @@ def init_db():
             password_hash TEXT NOT NULL,
             company_name TEXT DEFAULT '',
             currency TEXT DEFAULT 'USD',
+            is_superadmin BOOLEAN DEFAULT FALSE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )''')
         cur.execute('''CREATE TABLE IF NOT EXISTS usage_log (
@@ -58,6 +59,14 @@ def init_db():
             slides INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )''')
+        # Migrations
+        migrations = [
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin BOOLEAN DEFAULT FALSE",
+            "UPDATE users SET is_superadmin = TRUE WHERE id = (SELECT MIN(id) FROM users)",
+        ]
+        for m in migrations:
+            try: cur.execute(m)
+            except: pass
         conn.close()
         print("✅ Database ready")
     except Exception as e:
@@ -573,6 +582,7 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <a href="/" style="text-decoration:none;color:inherit"><h1>ProposalSnap</h1></a>
 <a href="https://snapsuite.up.railway.app" target="_blank" style="font-size:12px;color:#8B95B0;text-decoration:none;padding:6px 12px;border:1px solid #2A3148;border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">← SnapSuite</a>
 <a href="/logout" style="font-size:12px;color:#FF6B6B;text-decoration:none;padding:6px 12px;border:1px solid rgba(255,107,107,.3);border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">Sign Out</a>
+{% if is_admin %}<a href="/admin" style="font-size:12px;color:#A78BFA;text-decoration:none;padding:6px 12px;border:1px solid rgba(167,139,250,.3);border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">Admin</a>{% endif %}
 
 <div style="position:relative;display:inline-block"><button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'" style="font-size:14px;background:none;border:1px solid #2A3148;border-radius:6px;padding:5px 10px;color:#8B95B0;cursor:pointer;font-family:'DM Sans',sans-serif" title="Switch App">⊞</button><div style="display:none;position:absolute;right:0;top:32px;background:#141926;border:1px solid #2A3148;border-radius:10px;padding:8px;min-width:180px;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,.5)"><a href="https://invoicesnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📄 InvoiceSnap</a><a href="https://contractsnap-app.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📋 ContractSnap</a><a href="https://expensesnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📸 ExpenseSnap</a><a href="https://payslipsnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">💰 PayslipSnap</a></div></div>
 </div>
@@ -851,8 +861,10 @@ def register():
                 flash('Database not configured', 'error')
                 return render_template_string(REGISTER_HTML)
             cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            cur.execute('INSERT INTO users (email, password_hash, company_name, currency) VALUES (%s,%s,%s,%s) RETURNING id',
-                        (email, hash_pw(password), company, currency))
+            cur.execute('SELECT COUNT(*) as cnt FROM users')
+            is_first = cur.fetchone()['cnt'] == 0
+            cur.execute('INSERT INTO users (email, password_hash, company_name, currency, is_superadmin) VALUES (%s,%s,%s,%s,%s) RETURNING id',
+                        (email, hash_pw(password), company, currency, is_first))
             user_id = cur.fetchone()['id']
             conn.close()
             session['user_id'] = user_id
@@ -873,7 +885,156 @@ def logout():
 @app.route('/create')
 @login_required
 def create():
-    return render_template_string(MAIN_HTML)
+    is_admin = False
+    try:
+        conn = get_db()
+        if conn:
+            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cur.execute('SELECT is_superadmin FROM users WHERE id=%s', (session.get('user_id'),))
+            u = cur.fetchone()
+            is_admin = u.get('is_superadmin', False) if u else False
+            conn.close()
+    except: pass
+    return render_template_string(MAIN_HTML, is_admin=is_admin)
+
+@app.route('/admin')
+@login_required
+def admin_dashboard():
+    user_id = session.get('user_id')
+    try:
+        conn = get_db()
+        if not conn: return 'Database not configured', 500
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Check superadmin
+        cur.execute('SELECT * FROM users WHERE id=%s', (user_id,))
+        user = cur.fetchone()
+        if not user or not user.get('is_superadmin'):
+            flash('Access denied', 'error')
+            return redirect('/create')
+
+        # Platform stats
+        cur.execute('''SELECT
+            (SELECT COUNT(*) FROM users) as total_users,
+            (SELECT COUNT(*) FROM usage_log) as total_presentations,
+            (SELECT COALESCE(SUM(slides),0) FROM usage_log) as total_slides,
+            (SELECT COUNT(*) FROM users WHERE created_at > CURRENT_DATE - INTERVAL '7 days') as new_users_7d,
+            (SELECT COUNT(*) FROM usage_log WHERE created_at > CURRENT_DATE - INTERVAL '7 days') as presentations_7d
+        ''')
+        platform = cur.fetchone()
+
+        # All users with usage counts
+        cur.execute('''SELECT u.id, u.email, u.company_name, u.currency, u.is_superadmin, u.created_at,
+                      COUNT(l.id) as presentation_count,
+                      COALESCE(SUM(l.slides),0) as total_slides,
+                      MAX(l.created_at) as last_activity
+                      FROM users u LEFT JOIN usage_log l ON u.id = l.user_id
+                      GROUP BY u.id ORDER BY u.created_at DESC''')
+        users = cur.fetchall()
+
+        # Recent activity (last 50)
+        cur.execute('''SELECT l.*, u.email, u.company_name
+                      FROM usage_log l JOIN users u ON l.user_id = u.id
+                      ORDER BY l.created_at DESC LIMIT 50''')
+        activity = cur.fetchall()
+
+        conn.close()
+        return render_template_string(ADMIN_HTML, user=user, platform=platform,
+                                     users=users, activity=activity)
+    except Exception as e:
+        return f'Error: {e}', 500
+
+ADMIN_HTML = """<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProposalSnap — Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0B0F1A;--surface:#131829;--border:rgba(255,255,255,0.08);--text:#F0F0F5;--text2:#8B8FA3;--accent:#6C5CE7;--accent2:#A78BFA;--green:#00D2A0;--red:#FF6B6B;--orange:#f59e0b}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.wrap{max-width:1100px;margin:0 auto;padding:24px}
+.hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;flex-wrap:wrap;gap:12px}
+.hdr h1{font-size:24px;font-weight:800;color:#fff}
+.hdr h1 span{color:var(--accent)}
+.hdr-links a{font-size:13px;color:var(--text2);text-decoration:none;padding:8px 16px;border:1px solid var(--border);border-radius:8px;font-weight:600;margin-left:8px}
+.hdr-links a:hover{border-color:var(--accent);color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:32px}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px}
+.stat .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:6px}
+.stat .value{font-size:28px;font-weight:800;color:#fff}
+.stat .sub{font-size:12px;color:var(--text2);margin-top:4px}
+.section{margin-bottom:32px}
+.section h2{font-size:16px;font-weight:700;color:#fff;margin-bottom:14px}
+.tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.tbl th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);padding:12px 16px;text-align:left;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.tbl td{padding:10px 16px;font-size:13px;color:var(--text);border-bottom:1px solid rgba(255,255,255,.04)}
+.tbl tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700}
+.badge-admin{background:rgba(167,139,250,.15);color:var(--accent2)}
+.badge-new{background:rgba(0,210,160,.15);color:var(--green)}
+.empty{text-align:center;padding:40px;color:var(--text2);font-size:14px}
+@media(max-width:600px){.stats{grid-template-columns:1fr 1fr}.tbl{font-size:12px}.tbl th,.tbl td{padding:8px 10px}}
+</style></head>
+<body>
+<div class="wrap">
+<div class="hdr">
+<h1>Proposal<span>Snap</span> Admin</h1>
+<div class="hdr-links">
+<a href="/create">← Back to Tool</a>
+<a href="/logout" style="color:var(--red);border-color:rgba(255,107,107,.3)">Sign Out</a>
+</div>
+</div>
+
+<div class="stats">
+<div class="stat"><div class="label">Total Users</div><div class="value">{{ platform.total_users }}</div><div class="sub">+{{ platform.new_users_7d }} this week</div></div>
+<div class="stat"><div class="label">Presentations</div><div class="value">{{ platform.total_presentations }}</div><div class="sub">{{ platform.presentations_7d }} this week</div></div>
+<div class="stat"><div class="label">Total Slides</div><div class="value">{{ platform.total_slides }}</div></div>
+<div class="stat"><div class="label">Avg per User</div><div class="value">{{ '%.1f' | format(platform.total_presentations / platform.total_users if platform.total_users > 0 else 0) }}</div><div class="sub">presentations / user</div></div>
+</div>
+
+<div class="section">
+<h2>Registered Users ({{ users|length }})</h2>
+{% if users %}
+<table class="tbl">
+<tr><th>Email</th><th>Company</th><th>Presentations</th><th>Slides</th><th>Last Active</th><th>Joined</th></tr>
+{% for u in users %}
+<tr>
+<td>{{ u.email }} {% if u.is_superadmin %}<span class="badge badge-admin">Admin</span>{% endif %}</td>
+<td>{{ u.company_name or '—' }}</td>
+<td>{{ u.presentation_count }}</td>
+<td>{{ u.total_slides }}</td>
+<td>{{ u.last_activity.strftime('%d %b %Y') if u.last_activity else '—' }}</td>
+<td>{{ u.created_at.strftime('%d %b %Y') }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<div class="empty">No users yet</div>
+{% endif %}
+</div>
+
+<div class="section">
+<h2>Recent Activity</h2>
+{% if activity %}
+<table class="tbl">
+<tr><th>User</th><th>Company</th><th>Presentation</th><th>Slides</th><th>When</th></tr>
+{% for a in activity %}
+<tr>
+<td>{{ a.email }}</td>
+<td>{{ a.company_name or '—' }}</td>
+<td>{{ a.title or '—' }}</td>
+<td>{{ a.slides }}</td>
+<td>{{ a.created_at.strftime('%d %b %Y %H:%M') }}</td>
+</tr>
+{% endfor %}
+</table>
+{% else %}
+<div class="empty">No presentations generated yet</div>
+{% endif %}
+</div>
+</div>
+</body></html>"""
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
