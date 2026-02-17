@@ -4,22 +4,88 @@ ProposalSnap - AI Presentation Maker
 Upload your logo, describe your proposal, get a professional PPTX in seconds.
 """
 
-import os, json, uuid, subprocess, colorsys
+import os, json, uuid, subprocess, colorsys, hashlib, secrets
 from datetime import datetime
 from pathlib import Path
 from io import BytesIO
+from functools import wraps
 
 import anthropic
+import psycopg2
+import psycopg2.extras
+import requests as http_requests
 from PIL import Image
-from flask import Flask, request, jsonify, send_file, render_template_string, redirect
+from flask import Flask, request, jsonify, send_file, render_template_string, redirect, session, flash
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
 UPLOAD_DIR = Path(__file__).parent / "uploads"
 OUTPUT_DIR = Path(__file__).parent / "outputs"
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
+
+# ── Database ────────────────────────────────────────────────────
+def get_db():
+    db_url = os.environ.get('DATABASE_URL', '')
+    if not db_url:
+        raise Exception("DATABASE_URL not configured")
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    conn = psycopg2.connect(db_url)
+    conn.autocommit = True
+    return conn
+
+def init_db():
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute('''CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            company_name TEXT DEFAULT '',
+            currency TEXT DEFAULT 'USD',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        cur.execute('''CREATE TABLE IF NOT EXISTS presentations (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id),
+            title TEXT DEFAULT '',
+            filename TEXT DEFAULT '',
+            slides INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        conn.close()
+        print("✅ Database initialized")
+    except Exception as e:
+        print(f"⚠️ Database not available: {e}")
+        print("   Add a Postgres database and set DATABASE_URL to enable accounts")
+
+init_db()
+
+# ── Auth helpers ────────────────────────────────────────────────
+def hash_pw(pw):
+    return hashlib.sha256(pw.encode()).hexdigest()
+
+def register_with_hub(company_name, email, currency):
+    hub = os.environ.get('FINANCESNAP_URL', 'https://snapsuite.up.railway.app')
+    try:
+        http_requests.post(f'{hub}/api/register-company', json={
+            'app_name': 'ProposalSnap', 'company_name': company_name,
+            'email': email, 'currency': currency,
+            'app_url': 'https://proposalsnap.up.railway.app'
+        }, timeout=5)
+    except: pass
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect('/welcome')
+        return f(*args, **kwargs)
+    return decorated
 
 MODEL = "claude-sonnet-4-5-20250929"
 client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY', ''))
@@ -301,6 +367,8 @@ a{text-decoration:none;color:inherit}
 <p style="font-size:17px;color:var(--text2);line-height:1.7;margin-bottom:28px;max-width:560px;margin:0 auto 28px">Type what your project is about — AI generates a professional PowerPoint with smart layouts, branded colors, and structured slides. Ready to present in 30 seconds.</p>
 <div>
 <a href="/create" class="btn-hero btn-fill">Create Presentation →</a>
+<a href="/login" class="btn-hero btn-outline">Sign In</a>
+<a href="/register" class="btn-hero btn-outline">Create Account</a>
 <a href="#features" class="btn-hero btn-outline">See Features</a>
 <a href="/demo" class="btn-hero btn-outline">View Demo Gallery</a>
 </div>
@@ -331,9 +399,103 @@ a{text-decoration:none;color:inherit}
 </section>
 
 <section style="padding:40px 24px 80px;text-align:center">
-<a href="/create" style="display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff !important;border-radius:12px;font-size:17px;font-weight:700;transition:.2s;box-shadow:0 4px 20px rgba(108,92,231,.3)">Create Your Presentation →</a>
+<a href="/create" style="display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff !important;border-radius:12px;font-size:17px;font-weight:700;transition:.2s;box-shadow:0 4px 20px rgba(108,92,231,.3);margin:0 8px 10px">Create Presentation →</a>
+<a href="/login" style="display:inline-block;padding:18px 48px;background:transparent;color:var(--text) !important;border:1.5px solid rgba(255,255,255,.15);border-radius:12px;font-size:17px;font-weight:600;margin:0 8px 10px">Sign In</a>
+<a href="/register" style="display:inline-block;padding:18px 48px;background:transparent;color:var(--text) !important;border:1.5px solid rgba(255,255,255,.15);border-radius:12px;font-size:17px;font-weight:600;margin:0 8px 10px">Create Free Account</a>
 <div style="margin-top:20px;font-size:12px;color:var(--text2)">Part of <a href="https://snapsuite.up.railway.app" style="color:#A78BFA !important">SnapSuite</a> — 6 apps for your entire business</div>
 </section>
+</body></html>"""
+
+
+LOGIN_HTML = """<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProposalSnap — Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0B0F1A;--surface:#131829;--border:rgba(255,255,255,0.12);--text:#F0F0F5;--text2:#8B8FA3;--accent:#6C5CE7;--accent2:#A78BFA;--green:#00D2A0;--red:#FF6B6B}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.container{width:100%;max-width:440px;padding:24px}
+.logo{text-align:center;margin-bottom:32px}
+.logo .icon{width:56px;height:56px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;background:linear-gradient(135deg,#f59e0b,#ea580c);margin-bottom:12px}
+.logo h1{font-size:28px;font-weight:800;color:#fff}
+.logo h1 span{color:var(--accent)}
+.logo p{font-size:14px;color:var(--text2);margin-top:6px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px}
+.card h2{font-size:20px;font-weight:700;margin-bottom:20px;color:#fff}
+.fg{margin-bottom:16px}
+.fg label{display:block;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.fg input,.fg select{width:100%;padding:12px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:#fff;font-size:14px;font-family:inherit}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--accent)}
+.btn{width:100%;padding:14px;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff;transition:.2s}
+.btn:hover{opacity:.9;transform:translateY(-1px)}
+.sw{text-align:center;margin-top:16px;font-size:14px;color:var(--text2)}.sw a{color:var(--accent2);text-decoration:none;font-weight:600}
+.fl{padding:12px;border-radius:10px;font-size:13px;margin-bottom:16px}
+.fl.error{background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.2)}
+.fl.success{background:rgba(0,210,160,.1);color:var(--green);border:1px solid rgba(0,210,160,.2)}
+.suite{margin-top:24px;text-align:center;font-size:12px;color:var(--text2)}.suite a{color:var(--text2);text-decoration:none;font-weight:600}.suite a:hover{color:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="logo"><div class="icon">P</div><h1>Proposal<span>Snap</span></h1><p>AI-powered presentations in seconds</p></div>
+    {% with messages = get_flashed_messages(with_categories=true) %}{% for cat, msg in messages %}<div class="fl {{ cat }}">{{ msg }}</div>{% endfor %}{% endwith %}
+    <div class="card"><h2>Sign In</h2>
+        <form method="POST" action="/login">
+            <div class="fg"><label>Email</label><input type="email" name="email" required placeholder="you@company.com"></div>
+            <div class="fg"><label>Password</label><input type="password" name="password" required placeholder="Enter password"></div>
+            <button type="submit" class="btn">Sign In</button></form>
+        <div class="sw">New here? <a href="/register">Create account</a></div>
+    </div>
+    <div class="suite"><a href="/welcome">&larr; Back to ProposalSnap home</a></div>
+</div>
+</body></html>"""
+
+REGISTER_HTML = """<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProposalSnap — Create Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0B0F1A;--surface:#131829;--border:rgba(255,255,255,0.12);--text:#F0F0F5;--text2:#8B8FA3;--accent:#6C5CE7;--accent2:#A78BFA;--green:#00D2A0;--red:#FF6B6B}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center}
+.container{width:100%;max-width:440px;padding:24px}
+.logo{text-align:center;margin-bottom:32px}
+.logo .icon{width:56px;height:56px;border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;background:linear-gradient(135deg,#f59e0b,#ea580c);margin-bottom:12px}
+.logo h1{font-size:28px;font-weight:800;color:#fff}
+.logo h1 span{color:var(--accent)}
+.logo p{font-size:14px;color:var(--text2);margin-top:6px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:32px}
+.card h2{font-size:20px;font-weight:700;margin-bottom:20px;color:#fff}
+.fg{margin-bottom:16px}
+.fg label{display:block;font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.fg input,.fg select{width:100%;padding:12px 14px;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;color:#fff;font-size:14px;font-family:inherit}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--accent)}
+.btn{width:100%;padding:14px;border:none;border-radius:10px;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff;transition:.2s}
+.btn:hover{opacity:.9;transform:translateY(-1px)}
+.sw{text-align:center;margin-top:16px;font-size:14px;color:var(--text2)}.sw a{color:var(--accent2);text-decoration:none;font-weight:600}
+.fl{padding:12px;border-radius:10px;font-size:13px;margin-bottom:16px}
+.fl.error{background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.2)}
+.suite{margin-top:24px;text-align:center;font-size:12px;color:var(--text2)}.suite a{color:var(--text2);text-decoration:none;font-weight:600}.suite a:hover{color:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="container">
+    <div class="logo"><div class="icon">P</div><h1>Proposal<span>Snap</span></h1><p>AI-powered presentations in seconds</p></div>
+    {% with messages = get_flashed_messages(with_categories=true) %}{% for cat, msg in messages %}<div class="fl {{ cat }}">{{ msg }}</div>{% endfor %}{% endwith %}
+    <div class="card"><h2>Create Account</h2>
+        <form method="POST" action="/register">
+            <div class="fg"><label>Company Name</label><input type="text" name="company_name" required placeholder="Your company name"></div>
+            <div class="fg"><label>Email</label><input type="email" name="email" required placeholder="you@company.com"></div>
+            <div class="fg"><label>Password</label><input type="password" name="password" required minlength="6" placeholder="Min 6 characters"></div>
+            <div class="fg"><label>Currency</label><select name="currency"><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option><option value="INR">INR</option><option value="CAD">CAD</option><option value="MYR">MYR</option></select></div>
+            <button type="submit" class="btn">Create Account</button></form>
+        <div class="sw">Already have an account? <a href="/login">Sign in</a></div>
+    </div>
+    <div class="suite"><a href="/welcome">&larr; Back to ProposalSnap home</a></div>
+</div>
 </body></html>"""
 
 MAIN_HTML = """<!DOCTYPE html>
@@ -403,6 +565,7 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
 <a href="/" style="text-decoration:none;color:inherit"><h1>ProposalSnap</h1></a>
 <a href="https://snapsuite.up.railway.app" target="_blank" style="font-size:12px;color:#8B95B0;text-decoration:none;padding:6px 12px;border:1px solid #2A3148;border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">← SnapSuite</a>
+<a href="/logout" style="font-size:12px;color:#FF6B6B;text-decoration:none;padding:6px 12px;border:1px solid rgba(255,107,107,.3);border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">Sign Out</a>
 <div style="position:relative;display:inline-block"><button onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='block'?'none':'block'" style="font-size:14px;background:none;border:1px solid #2A3148;border-radius:6px;padding:5px 10px;color:#8B95B0;cursor:pointer;font-family:'DM Sans',sans-serif" title="Switch App">⊞</button><div style="display:none;position:absolute;right:0;top:32px;background:#141926;border:1px solid #2A3148;border-radius:10px;padding:8px;min-width:180px;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,.5)"><a href="https://invoicesnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📄 InvoiceSnap</a><a href="https://contractsnap-app.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📋 ContractSnap</a><a href="https://expensesnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">📸 ExpenseSnap</a><a href="https://payslipsnap.up.railway.app" style="display:block;padding:8px 12px;color:#E8ECF4;text-decoration:none;border-radius:6px;font-size:13px;font-weight:500;font-family:'DM Sans',sans-serif" onmouseover="this.style.background='#2A3148'" onmouseout="this.style.background='none'">💰 PayslipSnap</a></div></div>
 </div>
 <p class="subtitle">Fill in the details below and generate your deck</p>
@@ -640,7 +803,58 @@ def index():
 def welcome():
     return render_template_string(LANDING_HTML)
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if 'user_id' in session: return redirect('/create')
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        cur.execute('SELECT * FROM users WHERE email=%s', (email,))
+        user = cur.fetchone()
+        conn.close()
+        if user and user['password_hash'] == hash_pw(password):
+            session['user_id'] = user['id']
+            session['company_name'] = user['company_name']
+            return redirect('/create')
+        flash('Invalid email or password', 'error')
+    return render_template_string(LOGIN_HTML)
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if 'user_id' in session: return redirect('/create')
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        company = request.form.get('company_name', '').strip()
+        currency = request.form.get('currency', 'USD')
+        if len(password) < 6:
+            flash('Password must be at least 6 characters', 'error')
+            return render_template_string(REGISTER_HTML)
+        conn = get_db()
+        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        try:
+            cur.execute('INSERT INTO users (email, password_hash, company_name, currency) VALUES (%s,%s,%s,%s) RETURNING id',
+                        (email, hash_pw(password), company, currency))
+            user_id = cur.fetchone()['id']
+            session['user_id'] = user_id
+            session['company_name'] = company
+            register_with_hub(company, email, currency)
+            return redirect('/create')
+        except psycopg2.errors.UniqueViolation:
+            flash('Email already registered', 'error')
+        finally:
+            conn.close()
+    return render_template_string(REGISTER_HTML)
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect('/welcome')
+
 @app.route('/create')
+@login_required
 def create():
     return render_template_string(MAIN_HTML)
 
