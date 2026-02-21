@@ -5,7 +5,10 @@ Upload your logo, describe your proposal, get a professional PPTX in seconds.
 """
 
 import os, json, uuid, subprocess, colorsys, hashlib, secrets
-from datetime import datetime
+import bcrypt, smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime, timedelta
 from pathlib import Path
 from io import BytesIO
 from functools import wraps
@@ -17,10 +20,13 @@ import requests as http_requests
 from PIL import Image
 from pptx import Presentation as PptxPresentation
 from pptx.util import Inches, Pt
-from flask import Flask, request, jsonify, send_file, render_template_string, redirect, session, flash
+from flask import Flask, request, jsonify, send_file, render_template, render_template_string, redirect, session, flash
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
 UPLOAD_DIR = Path(__file__).parent / "uploads"
@@ -68,6 +74,12 @@ def init_db():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_logo TEXT DEFAULT ''",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_colors TEXT DEFAULT ''",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS brand_font TEXT DEFAULT 'aptos'",
+            """CREATE TABLE IF NOT EXISTS otp_codes (
+                id SERIAL PRIMARY KEY, email TEXT NOT NULL, code TEXT NOT NULL,
+                purpose TEXT DEFAULT 'login', attempts INTEGER DEFAULT 0,
+                used BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP NOT NULL)""",
+            "CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_codes(email, purpose, used)",
         ]
         for m in migrations:
             try: cur.execute(m)
@@ -81,7 +93,51 @@ init_db()
 
 # ── Auth helpers ────────────────────────────────────────────────
 def hash_pw(pw):
-    return hashlib.sha256(pw.encode()).hexdigest()
+    return bcrypt.hashpw(pw.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def check_pw(pw, hashed):
+    try:
+        return bcrypt.checkpw(pw.encode('utf-8'), hashed.encode('utf-8'))
+    except (ValueError, AttributeError):
+        if hashlib.sha256(pw.encode()).hexdigest() == hashed:
+            return True
+        return False
+
+def generate_otp():
+    return f"{secrets.randbelow(900000) + 100000}"
+
+def send_otp_email(email, code, purpose='login'):
+    smtp_host = os.environ.get('SMTP_HOST', '')
+    smtp_port = int(os.environ.get('SMTP_PORT', '587'))
+    smtp_user = os.environ.get('SMTP_USER', '')
+    smtp_pass = os.environ.get('SMTP_PASS', '')
+    smtp_from = os.environ.get('SMTP_FROM', smtp_user)
+    if not smtp_host or not smtp_user:
+        print(f"OTP for {email}: {code}")
+        return True
+    purpose_text = 'login' if purpose == 'login' else 'verification'
+    subject = f"Your ProposalSnap {purpose_text} code: {code}"
+    html = f"""<div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:24px">
+        <h2 style="color:#6C5CE7">ProposalSnap</h2>
+        <p style="color:#666;font-size:14px">Your {purpose_text} code is:</p>
+        <div style="font-size:36px;font-weight:800;letter-spacing:8px;color:#1a1a2e;text-align:center;
+                    padding:20px;background:#f0f4ff;border-radius:12px;margin:16px 0">{code}</div>
+        <p style="color:#999;font-size:12px">This code expires in 5 minutes.</p>
+    </div>"""
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = smtp_from
+    msg['To'] = email
+    msg.attach(MIMEText(html, 'html'))
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_pass)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Email send failed: {e}")
+        return False
 
 def register_with_hub(company_name, email, currency):
     hub = os.environ.get('FINANCESNAP_URL', 'https://snapsuite.up.railway.app')
@@ -1927,66 +1983,145 @@ def index():
 def welcome():
     return render_template_string(LANDING_HTML)
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET'])
 def login():
     if 'user_id' in session: return redirect('/create')
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        try:
-            conn = get_db()
-            if not conn:
-                flash('Database not configured', 'error')
-                return render_template_string(LOGIN_HTML)
-            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            cur.execute('SELECT * FROM users WHERE email=%s', (email,))
-            user = cur.fetchone()
-            conn.close()
-            if user and user['password_hash'] == hash_pw(password):
-                session['user_id'] = user['id']
-                session['company_name'] = user['company_name']
-                return redirect('/create')
-        except: pass
-        flash('Invalid email or password', 'error')
-    return render_template_string(LOGIN_HTML)
+    return render_template('login.html')
 
-@app.route('/register', methods=['GET', 'POST'])
+@app.route('/register', methods=['GET'])
 def register():
     if 'user_id' in session: return redirect('/create')
-    if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        company = request.form.get('company_name', '').strip()
-        currency = request.form.get('currency', 'USD')
-        if len(password) < 6:
-            flash('Password must be at least 6 characters', 'error')
-            return render_template_string(REGISTER_HTML)
-        try:
-            conn = get_db()
-            if not conn:
-                flash('Database not configured', 'error')
-                return render_template_string(REGISTER_HTML)
-            cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            cur.execute('SELECT COUNT(*) as cnt FROM users')
-            is_first = cur.fetchone()['cnt'] == 0
-            cur.execute('INSERT INTO users (email, password_hash, company_name, currency, is_superadmin) VALUES (%s,%s,%s,%s,%s) RETURNING id',
-                        (email, hash_pw(password), company, currency, is_first))
-            user_id = cur.fetchone()['id']
-            conn.close()
-            session['user_id'] = user_id
-            session['company_name'] = company
-            register_with_hub(company, email, currency)
-            return redirect('/create')
-        except psycopg2.errors.UniqueViolation:
-            flash('Email already registered', 'error')
-        except Exception as e:
-            flash(f'Error: {e}', 'error')
-    return render_template_string(REGISTER_HTML)
+    return render_template('login.html', show_register=True)
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect('/welcome')
+
+# --- OTP API ---
+@app.route('/api/auth/send-otp', methods=['POST'])
+def send_otp():
+    data = request.get_json()
+    email = (data.get('email') or '').strip().lower()
+    purpose = data.get('purpose', 'login')
+    if not email or '@' not in email:
+        return jsonify({"error": "Valid email required"}), 400
+    conn = get_db()
+    if not conn: return jsonify({"error": "Database not configured"}), 500
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("""SELECT COUNT(*) as cnt FROM otp_codes
+                   WHERE email=%s AND created_at > NOW() - INTERVAL '15 minutes'""", (email,))
+    if cur.fetchone()['cnt'] >= 5:
+        conn.close()
+        return jsonify({"error": "Too many requests. Wait 15 minutes."}), 429
+    if purpose == 'login':
+        cur.execute('SELECT id FROM users WHERE email=%s', (email,))
+        if not cur.fetchone():
+            conn.close()
+            return jsonify({"error": "No account found with this email"}), 404
+    if purpose == 'register':
+        cur.execute('SELECT id FROM users WHERE email=%s', (email,))
+        if cur.fetchone():
+            conn.close()
+            return jsonify({"error": "Email already registered. Please sign in."}), 409
+    cur.execute("UPDATE otp_codes SET used=TRUE WHERE email=%s AND purpose=%s AND used=FALSE", (email, purpose))
+    code = generate_otp()
+    expires = datetime.utcnow() + timedelta(minutes=5)
+    cur.execute("INSERT INTO otp_codes (email, code, purpose, expires_at) VALUES (%s,%s,%s,%s)",
+                (email, code, purpose, expires))
+    conn.close()
+    if send_otp_email(email, code, purpose):
+        return jsonify({"success": True})
+    return jsonify({"error": "Failed to send email"}), 500
+
+@app.route('/api/auth/verify-otp', methods=['POST'])
+def verify_otp():
+    data = request.get_json()
+    email = (data.get('email') or '').strip().lower()
+    code = (data.get('code') or '').strip()
+    purpose = data.get('purpose', 'login')
+    if not email or not code or len(code) != 6:
+        return jsonify({"error": "Email and 6-digit code required"}), 400
+    conn = get_db()
+    if not conn: return jsonify({"error": "Database not configured"}), 500
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("""SELECT * FROM otp_codes
+                   WHERE email=%s AND purpose=%s AND used=FALSE AND expires_at > NOW()
+                   ORDER BY created_at DESC LIMIT 1""", (email, purpose))
+    otp_rec = cur.fetchone()
+    if not otp_rec:
+        conn.close()
+        return jsonify({"error": "Code expired. Request a new one."}), 400
+    if otp_rec['attempts'] >= 3:
+        cur.execute("UPDATE otp_codes SET used=TRUE WHERE id=%s", (otp_rec['id'],))
+        conn.close()
+        return jsonify({"error": "Too many attempts. Request a new code."}), 429
+    cur.execute("UPDATE otp_codes SET attempts=attempts+1 WHERE id=%s", (otp_rec['id'],))
+    if not secrets.compare_digest(code, otp_rec['code']):
+        conn.close()
+        remaining = 2 - otp_rec['attempts']
+        return jsonify({"error": f"Invalid code. {remaining} attempt(s) remaining."}), 400
+    cur.execute("UPDATE otp_codes SET used=TRUE WHERE id=%s", (otp_rec['id'],))
+    if purpose == 'login':
+        cur.execute('SELECT * FROM users WHERE email=%s', (email,))
+        user = cur.fetchone()
+        conn.close()
+        if user:
+            session['user_id'] = user['id']
+            session['company_name'] = user.get('company_name', '')
+            session.permanent = True
+            return jsonify({"success": True, "redirect": "/create"})
+        return jsonify({"error": "User not found"}), 404
+    conn.close()
+    return jsonify({"success": True, "verified": True})
+
+@app.route('/api/auth/register', methods=['POST'])
+def api_register():
+    data = request.get_json()
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password', '')
+    company = (data.get('company_name') or '').strip()
+    currency = data.get('currency', 'USD')
+    code = (data.get('code') or '').strip()
+    if not email or not password or not company:
+        return jsonify({"error": "All fields required"}), 400
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+    if len(code) != 6:
+        return jsonify({"error": "Valid 6-digit code required"}), 400
+    conn = get_db()
+    if not conn: return jsonify({"error": "Database not configured"}), 500
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("""SELECT * FROM otp_codes
+                   WHERE email=%s AND purpose='register' AND used=FALSE AND expires_at > NOW()
+                   ORDER BY created_at DESC LIMIT 1""", (email,))
+    otp_rec = cur.fetchone()
+    if not otp_rec or not secrets.compare_digest(code, otp_rec['code']):
+        conn.close()
+        return jsonify({"error": "Invalid or expired code"}), 400
+    if otp_rec['attempts'] >= 3:
+        conn.close()
+        return jsonify({"error": "Too many attempts. Request a new code."}), 429
+    cur.execute("UPDATE otp_codes SET used=TRUE WHERE id=%s", (otp_rec['id'],))
+    cur.execute('SELECT id FROM users WHERE email=%s', (email,))
+    if cur.fetchone():
+        conn.close()
+        return jsonify({"error": "Email already registered"}), 409
+    cur.execute('SELECT COUNT(*) as cnt FROM users')
+    is_first = cur.fetchone()['cnt'] == 0
+    try:
+        cur.execute('INSERT INTO users (email, password_hash, company_name, currency, is_superadmin) VALUES (%s,%s,%s,%s,%s) RETURNING id',
+                    (email, hash_pw(password), company, currency, is_first))
+        user_id = cur.fetchone()['id']
+        conn.close()
+        session['user_id'] = user_id
+        session['company_name'] = company
+        session.permanent = True
+        register_with_hub(company, email, currency)
+        return jsonify({"success": True, "redirect": "/create"})
+    except psycopg2.errors.UniqueViolation:
+        conn.close()
+        return jsonify({"error": "Email already registered"}), 409
 
 @app.route('/create')
 @login_required
