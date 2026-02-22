@@ -281,15 +281,16 @@ AVAILABLE LAYOUTS:
 "closing": Thank you slide. Fields: subtitle, contact (string)
 
 RULES:
-1. First slide MUST be "title", second MUST be "agenda", last MUST be "closing"
-2. CRITICAL: Use at LEAST 6 different layout types. Do NOT repeat the same layout more than twice.
-3. ALWAYS include: at least one "stats", one "timeline" or "process_flow", and one of "icon_grid"/"comparison"/"metric_bar"
-4. Prefer visual layouts (stats, icon_grid, comparison, metric_bar, process_flow, checklist, quote) over plain "content"
-5. Use "content" for maximum 2 slides. Use visual layouts for the rest.
-6. Stats should have realistic, specific numbers
-7. Bullets should be concise (10-20 words each)
-8. Make content specific to the client and key points
-9. Return ONLY the JSON array, no other text
+1. If generating 4+ slides: First slide MUST be "title", second MUST be "agenda", last MUST be "closing"
+2. If generating 1-3 slides: Use the most impactful layouts. For 1 slide use "big_statement" or "content". For 2-3 slides, start with "title" and use visual layouts for the rest. No agenda or closing needed.
+3. CRITICAL: Use as many different layout types as possible. Do NOT repeat the same layout more than twice.
+4. For 6+ slides: ALWAYS include at least one "stats", one "timeline" or "process_flow", and one of "icon_grid"/"comparison"/"metric_bar"
+5. Prefer visual layouts (stats, icon_grid, comparison, metric_bar, process_flow, checklist, quote) over plain "content"
+6. Use "content" for maximum 2 slides. Use visual layouts for the rest.
+7. Stats should have realistic, specific numbers
+8. Bullets should be concise (10-20 words each)
+9. Make content specific to the client and key points
+10. Return ONLY the JSON array, no other text
 
 Generate exactly {num_slides} slides."""
 
@@ -370,12 +371,13 @@ RULES:
 1. PRESERVE the original content and meaning — polish, don't rewrite from scratch
 2. Apply the user's specific instructions (tone changes, additions, restructuring, etc.)
 3. Use visual layouts (stats, icon_grid, comparison, timeline) where the content fits
-4. First slide should be "title", last should be "closing"
-5. Use at least 5 different layout types for visual variety
-6. Keep bullets concise (10-20 words each)
-7. Generate exactly {num_slides} slides
-8. Tone: {tone}
-9. Return ONLY the JSON array, no other text"""
+4. For 4+ slides: First slide should be "title", last should be "closing"
+5. For 1-3 slides: Use the most impactful layouts, no need for title/closing wrapper
+6. Use as many different layout types as possible for visual variety
+7. Keep bullets concise (10-20 words each)
+8. Generate exactly {num_slides} slides
+9. Tone: {tone}
+10. Return ONLY the JSON array, no other text"""
 
     response = client.messages.create(
         model=MODEL, max_tokens=4000,
@@ -621,7 +623,7 @@ def generate():
         font_style = request.form.get('font_style', 'aptos')
         key_points = request.form.get('key_points', '').strip()
         num_slides = int(request.form.get('num_slides', 12))
-        num_slides = max(6, min(16, num_slides))
+        num_slides = max(1, min(16, num_slides))
         
         if not client_name: return jsonify({"error": "Client name is required"}), 400
         if not key_points: return jsonify({"error": "Key points are required"}), 400
@@ -692,7 +694,7 @@ def polish():
 
         # Determine slide count
         slide_count = int(num_slides) if num_slides else len(original_slides)
-        slide_count = max(6, min(20, slide_count))
+        slide_count = max(1, min(20, slide_count))
 
         # Polish with AI
         polished_slides = polish_slide_content(original_slides, instructions, slide_count, tone)
@@ -1253,6 +1255,9 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 </select></div>
 <div><label>Number of Slides</label>
 <select id="numSlides">
+<option>1</option>
+<option>3</option>
+<option>6</option>
 <option>8</option>
 <option>10</option>
 <option selected>12</option>
@@ -1283,12 +1288,11 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <p style="color:var(--text2);font-size:13px;margin-bottom:12px">Describe what the presentation should cover. The more detail, the better the output.</p>
 <textarea id="keyPoints" placeholder="Example:
 - We offer AI-powered expense management for small businesses
-- Key differentiator: Receipt scanning with 99% accuracy using Claude AI  
+- Key differentiator: Receipt scanning with high accuracy using AI  
 - Target market: Consulting firms with 5-50 employees
-- Pricing: $29-99/month depending on team size
-- Timeline: 2-week implementation, full training included
-- ROI: Save 10 hours/month on expense reporting
-- Request: Pilot program starting March 2025"></textarea>
+- Implementation: 2-week setup, full team training included
+- Benefits: Save significant time on expense reporting per employee
+- Security: HTTPS, data isolation, daily backups"></textarea>
 <div class="counter"><span id="charCount">0</span> characters</div>
 <div class="examples">
 <span class="example-tag" onclick="fillExample('proposal')">💼 Proposal</span>
@@ -1321,10 +1325,10 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <p style="color:var(--text2);font-size:13px;margin-bottom:12px">Tell the AI what to improve, restructure, or change. Be specific for best results.</p>
 <textarea id="polishInstructions" placeholder="Examples:
 - Make it more concise and executive-friendly
-- Add a timeline slide and a pricing comparison
-- Change the tone to be more persuasive for investors
+- Add a timeline slide and a comparison table
+- Change the tone to be more persuasive
 - Improve the visuals — use more charts and stats
-- Restructure: combine slides 3 & 4, expand the ROI section
+- Restructure: combine slides 3 & 4, expand the key benefits section
 - Add a team slide and a competitive advantage comparison
 - Make all bullets more action-oriented"></textarea>
 <div class="counter"><span id="polishCharCount">0</span> characters</div>
@@ -1365,6 +1369,8 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <div><label>Output Slides</label>
 <select id="polishNumSlides">
 <option value="">Same as original</option>
+<option>1</option>
+<option>3</option>
 <option>6</option>
 <option>8</option>
 <option>10</option>
@@ -1551,24 +1557,24 @@ async function handleLogo(input) {
 function fillExample(type) {
   const examples = {
     proposal: `Client wants an AI-powered expense management solution
-- Receipt scanning with 99% accuracy using Claude AI
+- Receipt scanning with high accuracy using AI
 - Multi-company support with role-based access
-- Real-time currency conversion (3-way: bill, home, USD)
+- Real-time currency conversion across multiple currencies
 - Key differentiator: works on phone camera, no app install needed
-- Target: consulting firms with 5-50 employees
-- Pricing: Starter $29/mo, Business $49/mo, Pro $99/mo
+- Target: consulting firms with small to mid-size teams
+- Flexible pricing tiers: Starter, Business, and Pro
 - Implementation: 2-week setup, full team training included
-- ROI: Save 10+ hours/month on expense reporting per employee
+- Benefits: Significant time savings on expense reporting per employee
 - Security: HTTPS, data isolation, PostgreSQL with daily backups`,
     pitch: `We are building the next generation of AI productivity tools
-- Problem: Small businesses waste 20+ hours/month on admin tasks
+- Problem: Small businesses waste significant time on admin tasks
 - Solution: AI agents that automate receipts, invoices, and reporting
-- Market size: $50B global expense management market
-- Traction: 3 paying clients, $500 MRR in first month
-- Technology: Claude AI for extraction, Railway for hosting
-- Team: 2 founders with 30+ years combined experience
-- Ask: $200K seed round for 12 months runway
-- Use of funds: Product development 60%, Sales 25%, Infrastructure 15%`,
+- Large and growing global expense management market
+- Early traction with paying clients and growing revenue
+- Technology: AI-powered extraction, cloud-hosted infrastructure
+- Team: Experienced founders with decades of combined experience
+- Seeking seed funding for product development and growth
+- Use of funds: Product development, Sales, Infrastructure`,
     training: `AI Training Program for Finance Team
 - Module 1: Introduction to AI in Finance (Copilot, Claude, ChatGPT)
 - Module 2: Prompt Engineering for Financial Analysis
@@ -1577,18 +1583,18 @@ function fillExample(type) {
 - Module 5: AI-Powered Financial Dashboards
 - Duration: 6 weeks, 2 sessions per week
 - Target audience: Finance managers and analysts
-- Expected outcomes: 40% reduction in manual tasks
+- Expected outcomes: Major reduction in manual tasks
 - Certification provided upon completion`,
-    report: `Q4 2024 Financial Performance Summary
-- Revenue: $2.4M (up 18% YoY)
-- New clients: 12 enterprise accounts acquired
-- Customer retention: 94% (industry avg: 85%)
-- Key wins: Zurich Insurance, ABB Robotics contracts
+    report: `Q4 Financial Performance Summary
+- Revenue growth year-over-year with strong momentum
+- New enterprise accounts acquired during the quarter
+- Customer retention above industry average
+- Key wins: Major contracts signed with leading companies
 - Challenges: Exchange rate fluctuations, supply chain delays
-- Cost optimization: Reduced operational costs by 15%
-- Headcount: Grew team from 45 to 58 employees
-- Q1 2025 outlook: Pipeline of $1.8M, targeting 22% growth
-- Strategic priorities: AI implementation, GDPR compliance, market expansion`
+- Cost optimization: Significant reduction in operational costs
+- Team growth during the quarter
+- Next quarter outlook: Strong pipeline, targeting continued growth
+- Strategic priorities: AI implementation, compliance, market expansion`
   };
   keyPointsEl.value = examples[type] || '';
   document.getElementById('charCount').textContent = keyPointsEl.value.length;
