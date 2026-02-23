@@ -24,7 +24,7 @@ from flask import Flask, request, jsonify, send_file, render_template, render_te
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'proposalsnap-prod-2026')
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=90)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
