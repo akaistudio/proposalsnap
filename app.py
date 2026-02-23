@@ -117,7 +117,7 @@ def send_otp_email(email, code, purpose='login'):
         <div style="font-size:36px;font-weight:800;letter-spacing:8px;color:#1a1a2e;text-align:center;
                     padding:20px;background:#f0f4ff;border-radius:12px;margin:16px 0">{code}</div>
         <p style="color:#999;font-size:12px">This code expires in 5 minutes. Do not share it.</p>
-        <p style="color:#999;font-size:11px;margin-top:20px">Part of <a href="https://snapsuite.up.railway.app" style="color:#f59e0b">SnapSuite</a></p>
+        <p style="color:#999;font-size:11px;margin-top:20px">Part of <a href="https://snapsuite.up.railway.app" style="color:#f59e0b">Varnam Suite</a></p>
     </div>"""
     if not resend_key:
         print(f"⚠️ RESEND_API_KEY not set. OTP for {email}: {code}")
@@ -1127,7 +1127,7 @@ a{text-decoration:none;color:inherit}
 <a href="/create" style="display:inline-block;padding:18px 48px;background:linear-gradient(135deg,#6C5CE7,#5A4BD1);color:#fff !important;border-radius:12px;font-size:17px;font-weight:700;transition:.2s;box-shadow:0 4px 20px rgba(108,92,231,.3);margin:0 8px 10px">Create Presentation →</a>
 <a href="/register" style="display:inline-block;padding:18px 48px;background:transparent;color:var(--text) !important;border:1.5px solid rgba(255,255,255,.15);border-radius:12px;font-size:17px;font-weight:600;margin:0 8px 10px">Create Free Account</a>
 
-<div style="margin-top:20px;font-size:12px;color:var(--text2)">Part of <a href="https://snapsuite.up.railway.app" style="color:#A78BFA !important">SnapSuite</a> — 6 apps for your entire business</div>
+<div style="margin-top:20px;font-size:12px;color:var(--text2)">Part of <a href="https://snapsuite.up.railway.app" style="color:#A78BFA !important">Varnam Suite</a> — 6 apps for your entire business</div>
 </section>
 </body></html>"""
 
@@ -1202,7 +1202,7 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <div class="container">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
 <a href="/" style="text-decoration:none;color:inherit"><h1>ProposalSnap</h1></a>
-<a href="https://snapsuite.up.railway.app" target="_blank" style="font-size:12px;color:#8B95B0;text-decoration:none;padding:6px 12px;border:1px solid #2A3148;border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">← SnapSuite</a>
+<a href="https://snapsuite.up.railway.app" target="_blank" style="font-size:12px;color:#8B95B0;text-decoration:none;padding:6px 12px;border:1px solid #2A3148;border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">← Varnam Suite</a>
 <a href="/logout" style="font-size:12px;color:#FF6B6B;text-decoration:none;padding:6px 12px;border:1px solid rgba(255,107,107,.3);border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">Sign Out</a>
 {% if is_admin %}<a href="/admin" style="font-size:12px;color:#A78BFA;text-decoration:none;padding:6px 12px;border:1px solid rgba(167,139,250,.3);border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">Admin</a>{% endif %}
 
@@ -2402,7 +2402,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <div class="topbar">
     <a href="/" style="text-decoration:none;color:inherit"><h1>Proposal<span>Snap</span></h1></a>
     <div class="topbar-right">
-        <a href="{{ hub_url }}">← SnapSuite</a>
+        <a href="{{ hub_url }}">← Varnam Suite</a>
         <a href="/" class="cta">+ Create New Proposal</a>
     </div>
 </div>
