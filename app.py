@@ -1210,7 +1210,7 @@ cursor:pointer;transition:all 0.2s}
 .file-upload:hover{border-color:var(--accent);background:rgba(108,92,231,0.05)}
 .file-upload.has-file{border-color:var(--green);background:rgba(0,210,160,0.05)}
 .file-upload input{display:none}
-.color-preview{display:flex;gap:8px;margin-top:12px;align-items:center}
+.color-preview{display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;position:relative;z-index:2}
 .color-dot{width:32px;height:32px;border-radius:8px;border:2px solid var(--border)}
 .color-label{font-size:11px;color:var(--text2);text-align:center;margin-top:2px}
 .status{padding:16px;border-radius:10px;margin-top:16px;display:none}
@@ -1578,7 +1578,7 @@ keyPointsEl.addEventListener('input', () => {
 async function handleLogo(input) {
   if (!input.files.length) return;
   const file = input.files[0];
-  document.getElementById('logoText').textContent = `✓ ${file.name}`;
+  document.getElementById('logoText').innerHTML = '<div style="display:flex;align-items:center;gap:10px;justify-content:center"><img id="logoThumb" src="'+URL.createObjectURL(file)+'" style="max-height:40px;max-width:80px;border-radius:6px;object-fit:contain"><span>✓ '+file.name+'</span></div>';
   document.getElementById('logoDropzone').classList.add('has-file');
   
   // Preview colors
