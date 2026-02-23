@@ -511,11 +511,11 @@ async function generatePresentation(data) {
       addFooter(slide, idx + 1, totalSlides, dark);
 
     // ═══ PRICING ═══
-    } else if (sType === "pricing") {
+    } else if (sType === "packages" || sType === "pricing") {
       slide.background = { color: light };
       addSideStripe(slide, accent);
 
-      slide.addText(sd.title || "Investment", {
+      slide.addText(sd.title || "Options", {
         x: 0.6, y: 0.35, w: 8.8, h: 0.6, fontSize: 28, fontFace: hFont, color: textDark, bold: true, margin: 0
       });
       slide.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.95, w: 0.8, h: 0.04, fill: { color: accent } });
@@ -535,17 +535,55 @@ async function generatePresentation(data) {
           slide.addText("RECOMMENDED", { x: xPos, y: 1.35, w: tierW, h: 0.22, fontSize: 8, fontFace: bFont, color: textLight, bold: true, align: "center", valign: "middle", margin: 0 });
         }
         slide.addText(tier.name || "", {
-          x: xPos, y: isHL ? 1.65 : 1.35, w: tierW, h: 0.4, fontSize: 16, fontFace: hFont, color: isHL ? textLight : textDark, bold: true, align: "center", margin: 0
-        });
-        slide.addText(tier.price || "", {
-          x: xPos, y: isHL ? 2.05 : 1.8, w: tierW, h: 0.55, fontSize: 28, fontFace: hFont, color: isHL ? accent : primary, bold: true, align: "center", margin: 0
+          x: xPos, y: isHL ? 1.65 : 1.35, w: tierW, h: 0.55, fontSize: 22, fontFace: hFont, color: isHL ? textLight : primary, bold: true, align: "center", margin: 0
         });
         var features = (tier.features || []).map(function(f, fi, a) {
           return { text: f, options: { bullet: { code: "25CF" }, fontSize: 10, fontFace: bFont, color: isHL ? secondary : textDark, breakLine: fi < a.length - 1, paraSpaceAfter: 4 } };
         });
         if (features.length) {
-          slide.addText(features, { x: xPos + 0.2, y: isHL ? 2.65 : 2.4, w: tierW - 0.4, h: 2, valign: "top", margin: 0 });
+          slide.addText(features, { x: xPos + 0.2, y: isHL ? 2.25 : 2.0, w: tierW - 0.4, h: 2.5, valign: "top", margin: 0 });
         }
+      });
+      addFooter(slide, idx + 1, totalSlides);
+
+    // ═══ INFOGRAPHIC ═══
+    } else if (sType === "infographic") {
+      slide.background = { color: light };
+      addSideStripe(slide, accent);
+
+      slide.addText(sd.title || "Key Facts", {
+        x: 0.6, y: 0.35, w: 8.8, h: 0.6, fontSize: 28, fontFace: hFont, color: textDark, bold: true, margin: 0
+      });
+      slide.addShape(pres.shapes.RECTANGLE, { x: 0.6, y: 0.95, w: 0.8, h: 0.04, fill: { color: accent } });
+
+      var infoItems = sd.items || [];
+      var rows = Math.ceil(infoItems.length / 3);
+      var cols = Math.min(infoItems.length, 3);
+      var itemW = (9 - (cols - 1) * 0.3) / cols;
+
+      infoItems.forEach(function(item, i) {
+        var col = i % 3;
+        var row = Math.floor(i / 3);
+        var xPos = 0.5 + col * (itemW + 0.3);
+        var yPos = 1.2 + row * 1.8;
+
+        // Card background
+        slide.addShape(pres.shapes.RECTANGLE, { x: xPos, y: yPos, w: itemW, h: 1.6, fill: { color: "FFFFFF" }, shadow: softShadow() });
+        // Accent top bar
+        slide.addShape(pres.shapes.RECTANGLE, { x: xPos, y: yPos, w: itemW, h: 0.04, fill: { color: accent } });
+        // Icon circle
+        slide.addShape(pres.shapes.OVAL, { x: xPos + itemW / 2 - 0.3, y: yPos + 0.15, w: 0.6, h: 0.6, fill: { color: accent } });
+        slide.addText(item.icon || "📊", {
+          x: xPos + itemW / 2 - 0.3, y: yPos + 0.15, w: 0.6, h: 0.6, fontSize: 20, align: "center", valign: "middle", margin: 0
+        });
+        // Stat value
+        slide.addText(String(item.stat || ""), {
+          x: xPos, y: yPos + 0.8, w: itemW, h: 0.35, fontSize: 20, fontFace: hFont, color: primary, bold: true, align: "center", margin: 0
+        });
+        // Label
+        slide.addText(item.label || "", {
+          x: xPos + 0.1, y: yPos + 1.15, w: itemW - 0.2, h: 0.35, fontSize: 10, fontFace: bFont, color: textDark, align: "center", margin: 0
+        });
       });
       addFooter(slide, idx + 1, totalSlides);
 

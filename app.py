@@ -269,7 +269,7 @@ AVAILABLE LAYOUTS:
 "two_column": Side-by-side comparison. Fields: left_title, left_bullets (array), right_title, right_bullets (array)
 "stats": Big number metrics (2-4 cards). Fields: stats (array of {{value, label, description}})
 "timeline": Process/timeline steps. Fields: steps (array of {{phase, description, duration}})
-"pricing": Investment/tier cards. Fields: tiers (array of {{name, price, features[], highlight bool}})
+"packages": Tier/option cards. Fields: tiers (array of {{name, features[], highlight bool}})
 "team": Team member cards. Fields: members (array of {{name, role, bio}})
 "icon_grid": 4-6 feature/service cards with icons. Fields: items (array of {{icon, heading, description}}). icon should be a single emoji.
 "comparison": Before vs After or comparison table. Fields: left_label, right_label, rows (array of {{feature, left_value, right_value}})
@@ -277,6 +277,7 @@ AVAILABLE LAYOUTS:
 "metric_bar": Horizontal progress bars. Fields: metrics (array of {{label, value, max_value, description}}). value and max_value are numbers (e.g. value:85, max_value:100)
 "process_flow": Numbered process with arrows. Fields: steps (array of {{number, title, description}})
 "checklist": Visual checklist/deliverables. Fields: items (array of strings), subtitle (string)
+"infographic": Visual data storytelling slide with icons and short facts. Fields: items (array of {{icon, stat, label}}). icon is a single emoji, stat is a short value or word, label is a brief description.
 "big_statement": One powerful sentence in large text. Fields: statement (string), supporting_text (string)
 "closing": Thank you slide. Fields: subtitle, contact (string)
 
@@ -356,7 +357,7 @@ AVAILABLE LAYOUTS:
 "two_column": Side-by-side comparison. Fields: left_title, left_bullets (array), right_title, right_bullets (array)
 "stats": Big number metrics (2-4 cards). Fields: stats (array of {{value, label, description}})
 "timeline": Process/timeline steps. Fields: steps (array of {{phase, description, duration}})
-"pricing": Investment/tier cards. Fields: tiers (array of {{name, price, features[], highlight bool}})
+"packages": Tier/option cards. Fields: tiers (array of {{name, features[], highlight bool}})
 "team": Team member cards. Fields: members (array of {{name, role, bio}})
 "icon_grid": 4-6 feature/service cards with icons. Fields: items (array of {{icon, heading, description}}). icon should be a single emoji.
 "comparison": Before vs After or comparison table. Fields: left_label, right_label, rows (array of {{feature, left_value, right_value}})
@@ -364,6 +365,7 @@ AVAILABLE LAYOUTS:
 "metric_bar": Horizontal progress bars. Fields: metrics (array of {{label, value, max_value, description}}). value and max_value are numbers.
 "process_flow": Numbered process with arrows. Fields: steps (array of {{number, title, description}})
 "checklist": Visual checklist/deliverables. Fields: items (array of strings), subtitle (string)
+"infographic": Visual data storytelling slide with icons and short facts. Fields: items (array of {{icon, stat, label}}). icon is a single emoji, stat is a short value or word, label is a brief description.
 "big_statement": One powerful sentence in large text. Fields: statement (string), supporting_text (string)
 "closing": Thank you slide. Fields: subtitle, contact (string)
 
@@ -462,7 +464,7 @@ AUDIENCE RULES:
 Restructure and adapt the content for this audience. Generate exactly {slide_count} slides.
 
 Return ONLY a valid JSON array of slide objects. Each slide MUST have:
-- "layout": one of: title, agenda, content, two_column, stats, timeline, pricing, team, icon_grid, comparison, quote, metric_bar, process_flow, checklist, big_statement, closing
+- "layout": one of: title, agenda, content, two_column, stats, timeline, packages, team, icon_grid, comparison, quote, metric_bar, process_flow, checklist, infographic, big_statement, closing
 - "title": slide title
 - Layout-specific fields (bullets, stats, steps, etc.)
 
@@ -544,7 +546,7 @@ Analyze the reference deck's patterns:
 Then restructure the content to MATCH that style while preserving the content's meaning.
 
 Return ONLY a valid JSON array of slide objects. Each slide MUST have:
-- "layout": one of: title, agenda, content, two_column, stats, timeline, pricing, team, icon_grid, comparison, quote, metric_bar, process_flow, checklist, big_statement, closing
+- "layout": one of: title, agenda, content, two_column, stats, timeline, packages, team, icon_grid, comparison, quote, metric_bar, process_flow, checklist, infographic, big_statement, closing
 - "title": slide title
 - Layout-specific fields
 
@@ -1102,7 +1104,7 @@ a{text-decoration:none;color:inherit}
 <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:2px;color:var(--accent);margin-bottom:12px;text-align:center">Features</div>
 <div style="font-size:28px;font-weight:800;color:#fff;text-align:center;margin-bottom:36px">Professional decks without the design work</div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">
-<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">🤖</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">AI Slide Generation</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Describe your project — AI creates 15+ layout types: timelines, stats, comparisons, icon grids, pricing tables, and more.</div></div>
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">🤖</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">AI Slide Generation</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Describe your project — AI creates 15+ layout types: timelines, stats, comparisons, icon grids, infographics, and more.</div></div>
 <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">✨</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Polish Existing Decks</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Upload any .pptx — AI improves tone, restructures slides, adds visuals. Quick presets: Make Concise, Investor-Ready, Executive Summary.</div></div>
 <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">👥</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Audience Versioning</div><div style="font-size:13px;color:var(--text2);line-height:1.6">One deck, three versions: 6-slide exec summary, 14-slide team detail, and 10-slide investor pitch — generated simultaneously.</div></div>
 <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:22px"><div style="font-size:26px;margin-bottom:10px">🎭</div><div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:6px">Style Transfer</div><div style="font-size:13px;color:var(--text2);line-height:1.6">Upload a reference deck you love + your content deck. AI copies the style, structure, and rhythm while keeping your data.</div></div>
@@ -1235,6 +1237,7 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <option>Project Report</option>
 <option>Business Plan</option>
 <option>Consulting Engagement</option>
+<option>Infographic Deck</option>
 </select></div>
 <div><label>Tone</label>
 <select id="tone">
@@ -1562,7 +1565,7 @@ function fillExample(type) {
 - Real-time currency conversion across multiple currencies
 - Key differentiator: works on phone camera, no app install needed
 - Target: consulting firms with small to mid-size teams
-- Flexible pricing tiers: Starter, Business, and Pro
+- Three service tiers: Starter, Business, and Pro
 - Implementation: 2-week setup, full team training included
 - Benefits: Significant time savings on expense reporting per employee
 - Security: HTTPS, data isolation, PostgreSQL with daily backups`,
@@ -2427,7 +2430,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
             </div>
         </div>
         <div class="ph-right">
-            <div class="price">₹1,85,000</div>
+            <div class="price" style="font-size:13px;color:var(--accent2)">12 Slides</div>
             <span class="status sent">Sent</span>
         </div>
     </div>
@@ -2640,7 +2643,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
                 </div>
                 <div class="slide-inner">
                     <span class="slide-label">INVESTMENT</span>
-                    <h4>₹1,85,000</h4>
+                    <h4>Full Package</h4>
                     <div class="divider"></div>
                     <div class="metric-row">
                         <div class="metric"><div class="mv" style="color:#e94560">50%</div><div class="ml">Upfront</div></div>
@@ -2694,7 +2697,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
             </div>
         </div>
         <div class="ph-right">
-            <div class="price">₹95,000</div>
+            <div class="price" style="font-size:13px;color:var(--accent2)">8 Slides</div>
             <span class="status accepted">Accepted</span>
         </div>
     </div>
@@ -2775,7 +2778,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
                 <div class="slide-deco"><div class="corner tl" style="color:#f5c6a5"></div><div class="corner br" style="color:#f5c6a5"></div></div>
                 <div class="slide-inner">
                     <span class="slide-label" style="color:#f5c6a5">INVESTMENT</span>
-                    <h4>₹95,000</h4>
+                    <h4>Complete Package</h4>
                     <div class="divider" style="background:linear-gradient(90deg,#f5c6a5,#c62a88)"></div>
                     <p>Complete package including setup, all materials, lighting, day-of coordination, and breakdown. Travel within Jaipur included.</p>
                     <div class="metric-row">
@@ -2824,7 +2827,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
             </div>
         </div>
         <div class="ph-right">
-            <div class="price">₹45,000</div>
+            <div class="price" style="font-size:13px;color:var(--accent2)">10 Slides</div>
             <span class="status draft">Draft</span>
         </div>
     </div>
@@ -2895,7 +2898,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
                 <div class="slide-deco"><div class="corner tl" style="color:#64ffda"></div><div class="corner br" style="color:#64ffda"></div></div>
                 <div class="slide-inner">
                     <span class="slide-label" style="color:#64ffda">INVESTMENT</span>
-                    <h4>₹45,000</h4>
+                    <h4>Starter Package</h4>
                     <div class="divider" style="background:#64ffda"></div>
                     <p>For up to 25 participants. Includes all materials, instruction, venue setup, and a finished mural for your office wall.</p>
                     <div class="metric-row">
