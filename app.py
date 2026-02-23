@@ -176,50 +176,53 @@ client = anthropic.Anthropic(api_key=os.environ.get('ANTHROPIC_API_KEY', ''))
 
 # ── Color Extraction ──────────────────────────────────────────
 def extract_colors_from_logo(logo_path):
-    """Extract dominant colors from logo and generate complementary palette"""
+    """Extract dominant colors from logo and generate a visually balanced palette"""
     try:
         img = Image.open(logo_path).convert("RGB")
         img = img.resize((100, 100))
         pixels = list(img.getdata())
         
-        # Filter out near-white and near-black pixels
-        filtered = [(r, g, b) for r, g, b in pixels 
-                     if not (r > 240 and g > 240 and b > 240) 
-                     and not (r < 15 and g < 15 and b < 15)]
+        # Filter out near-white, near-black, and very desaturated pixels
+        filtered = []
+        for r, g, b in pixels:
+            h, s, v = colorsys.rgb_to_hsv(r/255, g/255, b/255)
+            if s > 0.15 and 0.1 < v < 0.95:
+                filtered.append((r, g, b, h, s, v))
+        
+        if len(filtered) < 10:
+            filtered = [(r, g, b, *colorsys.rgb_to_hsv(r/255, g/255, b/255)) 
+                       for r, g, b in pixels 
+                       if not (r > 240 and g > 240 and b > 240) 
+                       and not (r < 15 and g < 15 and b < 15)]
         
         if not filtered:
-            filtered = pixels
+            return default_colors()
         
-        # Simple dominant color: average of filtered pixels
-        avg_r = int(sum(p[0] for p in filtered) / len(filtered))
-        avg_g = int(sum(p[1] for p in filtered) / len(filtered))
-        avg_b = int(sum(p[2] for p in filtered) / len(filtered))
+        # Pick the most vivid color as primary
+        filtered.sort(key=lambda p: p[4] * p[5], reverse=True)
+        best = filtered[0]
+        r, g, b = best[0], best[1], best[2]
+        h, s, v = best[3], best[4], best[5]
         
-        # Get most vivid pixel (highest saturation)
-        best_sat = 0
-        vivid = (avg_r, avg_g, avg_b)
-        for r, g, b in filtered:
-            h, s, v = colorsys.rgb_to_hsv(r/255, g/255, b/255)
-            if s > best_sat and v > 0.2:
-                best_sat = s
-                vivid = (r, g, b)
+        # Ensure primary is rich enough for headings
+        ps = max(0.5, s)
+        pv = max(0.35, min(0.75, v))
+        pr, pg, pb = colorsys.hsv_to_rgb(h, ps, pv)
+        primary_hex = f"{int(pr*255):02x}{int(pg*255):02x}{int(pb*255):02x}"
         
-        primary_hex = f"{vivid[0]:02x}{vivid[1]:02x}{vivid[2]:02x}"
-        
-        # Generate complementary colors
-        h, s, v = colorsys.rgb_to_hsv(vivid[0]/255, vivid[1]/255, vivid[2]/255)
-        
-        # Secondary: lighter version
-        sr, sg, sb = colorsys.hsv_to_rgb(h, max(0.1, s * 0.3), min(1.0, v * 1.4 + 0.3))
+        # Secondary: very light tint of primary (for backgrounds)
+        sr, sg, sb = colorsys.hsv_to_rgb(h, max(0.05, s * 0.15), min(1.0, 0.92 + v * 0.06))
         secondary_hex = f"{int(sr*255):02x}{int(sg*255):02x}{int(sb*255):02x}"
         
-        # Accent: shifted hue, high saturation
-        ah, as_, av = (h + 0.08) % 1.0, min(1.0, s * 1.2 + 0.1), min(1.0, v * 1.1 + 0.1)
-        ar, ag, ab = colorsys.hsv_to_rgb(ah, as_, av)
+        # Accent: shifted hue for visual interest, rich saturation
+        ah = (h + 0.55) % 1.0  # complementary hue
+        avs = max(0.5, min(0.9, s))
+        avv = max(0.45, min(0.85, v * 1.1))
+        ar, ag, ab = colorsys.hsv_to_rgb(ah, avs, avv)
         accent_hex = f"{int(ar*255):02x}{int(ag*255):02x}{int(ab*255):02x}"
         
-        # Dark: very dark version of primary
-        dr, dg, db = colorsys.hsv_to_rgb(h, min(0.6, s * 0.8), 0.12)
+        # Dark: very dark version for backgrounds
+        dr, dg, db = colorsys.hsv_to_rgb(h, min(0.5, s * 0.6), 0.12)
         dark_hex = f"{int(dr*255):02x}{int(dg*255):02x}{int(db*255):02x}"
         
         return {
@@ -643,6 +646,14 @@ def generate():
                 if logo_ext != '.svg':
                     colors = extract_colors_from_logo(str(logo_path))
         
+        # Manual color overrides
+        manual_primary = request.form.get('color_primary', '').strip().lstrip('#')
+        manual_accent = request.form.get('color_accent', '').strip().lstrip('#')
+        if manual_primary and len(manual_primary) == 6:
+            colors['primary'] = manual_primary
+        if manual_accent and len(manual_accent) == 6:
+            colors['accent'] = manual_accent
+        
         # Generate content with Claude
         slides = generate_slide_content(client_name, company_name, pres_type, tone, key_points, num_slides)
         
@@ -769,6 +780,10 @@ def brand_settings():
     font = request.form.get('font', 'aptos')
     cur.execute('UPDATE users SET brand_font=%s WHERE id=%s', (font, uid))
 
+    # Manual color overrides
+    manual_primary = request.form.get('color_primary', '').strip().lstrip('#')
+    manual_accent = request.form.get('color_accent', '').strip().lstrip('#')
+    
     if 'logo' in request.files and request.files['logo'].filename:
         logo_file = request.files['logo']
         logo_ext = Path(logo_file.filename).suffix.lower()
@@ -779,8 +794,27 @@ def brand_settings():
             colors = default_colors()
             if logo_ext != '.svg':
                 colors = extract_colors_from_logo(str(logo_path))
+            # Apply manual overrides if provided
+            if manual_primary and len(manual_primary) == 6:
+                colors['primary'] = manual_primary
+            if manual_accent and len(manual_accent) == 6:
+                colors['accent'] = manual_accent
             cur.execute('UPDATE users SET brand_logo=%s, brand_colors=%s WHERE id=%s',
                        (str(logo_path), json.dumps(colors), uid))
+    elif manual_primary or manual_accent:
+        # No new logo, but user wants to adjust colors
+        cur.execute('SELECT brand_colors FROM users WHERE id=%s', (uid,))
+        existing = cur.fetchone()
+        colors = default_colors()
+        if existing and existing.get('brand_colors'):
+            try: colors = json.loads(existing['brand_colors'])
+            except: pass
+        if manual_primary and len(manual_primary) == 6:
+            colors['primary'] = manual_primary
+        if manual_accent and len(manual_accent) == 6:
+            colors['accent'] = manual_accent
+        cur.execute('UPDATE users SET brand_colors=%s WHERE id=%s',
+                   (json.dumps(colors), uid))
 
     conn.close()
     return jsonify({"success": True})
@@ -1272,7 +1306,7 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 
 <div class="card">
 <h3>🎨 Logo & Branding</h3>
-<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Upload your logo — we'll extract colors to style the entire presentation.</p>
+<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Upload your logo — we'll extract colors. You can also adjust colors manually.</p>
 <div class="file-upload" id="logoDropzone" onclick="document.getElementById('logoInput').click()">
 <input type="file" id="logoInput" accept=".png,.jpg,.jpeg,.webp,.svg" onchange="handleLogo(this)">
 <div id="logoText">📎 Click to upload logo (PNG, JPG, SVG)</div>
@@ -1282,7 +1316,11 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 <div><div class="color-dot" id="csecondary"></div><div class="color-label">Secondary</div></div>
 <div><div class="color-dot" id="caccent"></div><div class="color-label">Accent</div></div>
 <div><div class="color-dot" id="cdark"></div><div class="color-label">Dark</div></div>
-<div style="flex:1;font-size:12px;color:var(--text2);padding-left:8px">Colors extracted from your logo</div>
+</div>
+<div style="margin-top:12px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+<div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">Primary</label><input type="color" id="manualPrimary" value="#1E2761" style="width:36px;height:30px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent"></div>
+<div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">Accent</label><input type="color" id="manualAccent" value="#4A90D9" style="width:36px;height:30px;border:1px solid var(--border);border-radius:6px;cursor:pointer;background:transparent"></div>
+<span style="font-size:11px;color:var(--text2)">Override extracted colors</span>
 </div>
 </div>
 
@@ -1554,6 +1592,8 @@ async function handleLogo(input) {
     document.getElementById('caccent').style.background = '#' + colors.accent;
     document.getElementById('cdark').style.background = '#' + colors.dark;
     document.getElementById('colorPreview').style.display = 'flex';
+    if(document.getElementById('manualPrimary')) document.getElementById('manualPrimary').value = '#' + colors.primary;
+    if(document.getElementById('manualAccent')) document.getElementById('manualAccent').value = '#' + colors.accent;
   } catch(e) { console.error(e); }
 }
 
@@ -1633,6 +1673,10 @@ async function generate() {
   if (logoInput.files.length) {
     formData.append('logo', logoInput.files[0]);
   }
+  const mp = document.getElementById('manualPrimary');
+  const ma = document.getElementById('manualAccent');
+  if (mp) formData.append('color_primary', mp.value.replace('#',''));
+  if (ma) formData.append('color_accent', ma.value.replace('#',''));
   
   try {
     const res = await fetch('/api/generate', { method: 'POST', body: formData });
