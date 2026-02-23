@@ -23,7 +23,7 @@ from pptx.util import Inches, Pt
 from flask import Flask, request, jsonify, send_file, render_template, render_template_string, redirect, session, flash
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+app.secret_key = os.environ.get('SECRET_KEY', 'proposalsnap-prod-2026')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
