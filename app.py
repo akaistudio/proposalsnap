@@ -2147,15 +2147,11 @@ def admin_dashboard():
         conn = get_db()
         if not conn: return 'Database not configured', 500
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-        # Check superadmin
         cur.execute('SELECT * FROM users WHERE id=%s', (user_id,))
         user = cur.fetchone()
         if not user or not user.get('is_superadmin'):
             flash('Access denied', 'error')
             return redirect('/create')
-
-        # Platform stats
         cur.execute('''SELECT
             (SELECT COUNT(*) FROM users) as total_users,
             (SELECT COUNT(*) FROM usage_log) as total_presentations,
@@ -2164,25 +2160,24 @@ def admin_dashboard():
             (SELECT COUNT(*) FROM usage_log WHERE created_at > CURRENT_DATE - INTERVAL '7 days') as presentations_7d
         ''')
         platform = cur.fetchone()
-
-        # All users with usage counts
         cur.execute('''SELECT u.id, u.email, u.company_name, u.currency, u.is_superadmin, u.created_at,
                       COUNT(l.id) as presentation_count,
-                      COALESCE(SUM(l.slides),0) as total_slides,
-                      MAX(l.created_at) as last_activity
+                      COALESCE(SUM(l.slides),0) as total_slides
                       FROM users u LEFT JOIN usage_log l ON u.id = l.user_id
                       GROUP BY u.id ORDER BY u.created_at DESC''')
-        users = cur.fetchall()
-
-        # Recent activity (last 50)
-        cur.execute('''SELECT l.*, u.email, u.company_name
-                      FROM usage_log l JOIN users u ON l.user_id = u.id
-                      ORDER BY l.created_at DESC LIMIT 50''')
-        activity = cur.fetchall()
-
+        companies = cur.fetchall()
+        company_id = request.args.get('company_id')
+        company_items = []
+        selected_company = None
+        if company_id:
+            cur.execute('SELECT * FROM users WHERE id=%s', (company_id,))
+            selected_company = cur.fetchone()
+            cur.execute('''SELECT * FROM usage_log WHERE user_id=%s ORDER BY created_at DESC''', (company_id,))
+            company_items = cur.fetchall()
         conn.close()
-        return render_template_string(ADMIN_HTML, user=user, platform=platform,
-                                     users=users, activity=activity)
+        return render_template('admin.html', user=user, platform=platform,
+                               companies=companies, company_items=company_items,
+                               selected_company=selected_company)
     except Exception as e:
         return f'Error: {e}', 500
 
