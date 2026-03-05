@@ -80,6 +80,19 @@ def init_db():
                 used BOOLEAN DEFAULT FALSE, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 expires_at TIMESTAMP NOT NULL)""",
             "CREATE INDEX IF NOT EXISTS idx_otp_email ON otp_codes(email, purpose, used)",
+            """CREATE TABLE IF NOT EXISTS proposals (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                company_name TEXT DEFAULT '',
+                client_name TEXT DEFAULT '',
+                presentation_type TEXT DEFAULT 'Corporate Proposal',
+                title TEXT DEFAULT '',
+                key_points TEXT DEFAULT '',
+                num_slides INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'generated',
+                download_url TEXT DEFAULT '',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""",
         ]
         for m in migrations:
             try: cur.execute(m)
@@ -195,6 +208,23 @@ def log_usage(title='', slides=0):
         cur = conn.cursor()
         cur.execute('INSERT INTO usage_log (user_id, action, title, slides) VALUES (%s,%s,%s,%s)',
                     (uid, 'generate', title[:200], slides))
+        conn.close()
+    except: pass
+
+def save_proposal(client_name, company_name, pres_type, key_points, num_slides, download_url):
+    """Save generated proposal to proposals table for FinanceSnap integration"""
+    try:
+        uid = session.get('user_id')
+        if not uid: return
+        conn = get_db()
+        if not conn: return
+        cur = conn.cursor()
+        title = f"{client_name} — {pres_type}"
+        cur.execute('''INSERT INTO proposals (user_id, company_name, client_name,
+                      presentation_type, title, key_points, num_slides, status, download_url)
+                      VALUES (%s,%s,%s,%s,%s,%s,%s,'generated',%s)''',
+                    (uid, company_name[:200], client_name[:200], pres_type[:100],
+                     title[:300], key_points[:500], num_slides, download_url[:500]))
         conn.close()
     except: pass
 
@@ -692,9 +722,11 @@ def generate():
         
         filename = f"{client_name.replace(' ', '_')}_{pres_type.replace(' ', '_')}.pptx"
         log_usage(title=f"{client_name} — {pres_type}", slides=len(slides))
+        download_url = f"/api/download/{Path(output_path).name}"
+        save_proposal(client_name, company_name, pres_type, key_points, len(slides), download_url)
         return jsonify({
             "success": True,
-            "download_url": f"/api/download/{Path(output_path).name}",
+            "download_url": download_url,
             "filename": filename,
             "slides_count": len(slides),
             "colors": colors
@@ -845,6 +877,46 @@ def brand_settings():
 
     conn.close()
     return jsonify({"success": True})
+
+# ── FinanceSnap Integration ───────────────────────────────────
+@app.route('/api/proposals')
+def api_proposals():
+    """External API for FinanceSnap to pull proposal data"""
+    api_key = request.headers.get('X-API-Key', '')
+    if not api_key:
+        return jsonify({'error': 'API key required'}), 401
+    conn = get_db()
+    if not conn:
+        return jsonify({'error': 'DB unavailable'}), 500
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute('SELECT * FROM users WHERE email=%s', (api_key,))
+    user = cur.fetchone()
+    if not user:
+        conn.close()
+        return jsonify({'error': 'Invalid API key'}), 401
+
+    company_name = request.args.get('company_name', '')
+    q = 'SELECT * FROM proposals WHERE user_id=%s'
+    params = [user['id']]
+    if company_name:
+        user_company = user.get('company_name', '') or ''
+        if user_company.lower().strip() == company_name.lower().strip():
+            q += " AND (LOWER(company_name)=LOWER(%s) OR company_name IS NULL OR company_name='')"
+        else:
+            q += ' AND LOWER(company_name)=LOWER(%s)'
+        params.append(company_name)
+    cur.execute(q + ' ORDER BY created_at DESC', params)
+    proposals = cur.fetchall()
+    conn.close()
+    for p in proposals:
+        for k, v in p.items():
+            if hasattr(v, 'isoformat'):
+                p[k] = v.isoformat()
+    return jsonify({'proposals': proposals, 'count': len(proposals)})
+
+@app.route('/health')
+def health():
+    return jsonify({'status': 'ok', 'app': 'ProposalSnap'})
 
 # ── Audience Versioning ───────────────────────────────────────
 @app.route('/api/version', methods=['POST'])
