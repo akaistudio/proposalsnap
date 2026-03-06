@@ -2054,18 +2054,33 @@ def index():
 
 @app.route('/demo')
 def demo_login():
-    """One-click demo login."""
+    """One-click demo — shared Bloom Studio account, reseeds every 24h."""
+    from datetime import datetime, timedelta
     demo_email = 'demo@varnam.app'
     conn = get_db(); cur = conn.cursor()
+    try:
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS demo_reset_at TIMESTAMP")
+        if not conn.autocommit: conn.commit()
+    except: pass
     cur.execute('SELECT * FROM users WHERE email=%s', (demo_email,))
     user = cur.fetchone()
+    needs_seed = False
     if not user:
-        cur.execute('INSERT INTO users (email, password_hash, company_name, currency, is_superadmin) VALUES (%s,%s,%s,%s,%s) RETURNING id',
-                   (demo_email, hash_pw('demo123'), 'Bloom Studio', 'INR', True))
+        cur.execute("""INSERT INTO users (email, password_hash, company_name, currency, is_superadmin, demo_reset_at)
+                       VALUES (%s,%s,'Bloom Studio','INR',TRUE,NOW()) RETURNING id""",
+                   (demo_email, hash_pw('demo123')))
         user_id = cur.fetchone()['id']
         if not conn.autocommit: conn.commit()
+        needs_seed = True
     else:
         user_id = user['id']
+        last_reset = user.get('demo_reset_at')
+        if not last_reset or (datetime.utcnow() - last_reset.replace(tzinfo=None)) > timedelta(hours=24):
+            needs_seed = True
+    if needs_seed:
+        cur.execute("DELETE FROM presentations WHERE user_id=%s", (user_id,))
+        cur.execute("UPDATE users SET demo_reset_at=NOW() WHERE id=%s", (user_id,))
+        if not conn.autocommit: conn.commit()
     session.clear()
     session['user_id'] = user_id
     session.permanent = True
