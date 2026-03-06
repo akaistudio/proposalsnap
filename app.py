@@ -2078,7 +2078,7 @@ def demo_login():
         if not last_reset or (datetime.utcnow() - last_reset.replace(tzinfo=None)) > timedelta(hours=24):
             needs_seed = True
     if needs_seed:
-        cur.execute("DELETE FROM presentations WHERE user_id=%s", (user_id,))
+        cur.execute("DELETE FROM proposals WHERE user_id=%s", (user_id,))
         cur.execute("UPDATE users SET demo_reset_at=NOW() WHERE id=%s", (user_id,))
         if not conn.autocommit: conn.commit()
     session.clear()
