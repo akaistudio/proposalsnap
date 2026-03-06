@@ -45,6 +45,13 @@ def get_db():
     conn.autocommit = True
     return conn
 
+@app.errorhandler(500)
+def handle_500(e):
+    import traceback
+    tb = traceback.format_exc()
+    print(f"[500 ERROR] {tb}")
+    return f"<pre style='padding:20px;background:#1a1a2e;color:#ff6b6b;font-size:12px'><b>500 Error</b>\n\n{tb}</pre>", 500
+
 def init_db():
     try:
         conn = get_db()
