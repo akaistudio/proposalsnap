@@ -1224,7 +1224,9 @@ a{text-decoration:none;color:inherit}
 </style>
 </head>
 <body>
-<section style="min-height:80vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:60px 24px 40px;position:relative;overflow:hidden">
+<div style="position:fixed;top:0;left:0;right:0;z-index:100;padding:12px 24px;display:flex;align-items:center;justify-content:space-between;background:rgba(11,15,26,0.9);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,0.06)"><a href="https://snapsuite.up.railway.app" style="font-size:13px;color:#8B95B0;text-decoration:none;font-weight:600">← Varnam Suite</a><a href="/login" style="font-size:13px;color:#fff;text-decoration:none;font-weight:700;padding:8px 18px;background:var(--accent);border-radius:8px">Sign In</a></div>
+
+<section style="min-height:80vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:100px 24px 40px;position:relative;overflow:hidden">
 <div style="position:absolute;width:600px;height:600px;background:radial-gradient(circle,rgba(108,92,231,.12),transparent 70%);top:-100px;right:-100px;pointer-events:none;z-index:0"></div>
 <div style="max-width:700px;position:relative;z-index:1">
 <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(108,92,231,.1);border:1px solid rgba(108,92,231,.2);border-radius:20px;padding:6px 16px;font-size:12px;font-weight:700;color:var(--accent);margin-bottom:24px">✦ AI-Powered Presentations</div>
