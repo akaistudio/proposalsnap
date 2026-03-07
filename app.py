@@ -103,7 +103,8 @@ def init_db():
         ]
         for m in migrations:
             try: cur.execute(m)
-            except: pass
+            except: conn.rollback()
+        conn.commit()
         conn.close()
         print("✅ Database ready")
     except Exception as e:
@@ -2646,7 +2647,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <body>
 
 <div class="topbar">
-    <a href="/" style="text-decoration:none;color:inherit"><h1>Proposal<span>Snap</span></h1></a>
+    <a href="/welcome" style="text-decoration:none;color:inherit"><h1>Proposal<span>Snap</span></h1></a>
     <div class="topbar-right">
         <a href="{{ hub_url }}">← Varnam Suite</a>
         <a href="/" class="cta">+ Create New Proposal</a>
