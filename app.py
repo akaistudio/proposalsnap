@@ -2612,14 +2612,17 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 /* Responsive */
 @media(max-width:768px){
     .topbar{padding:10px 14px;flex-wrap:wrap;gap:6px}
+    .topbar-right{flex-wrap:wrap;gap:4px}
+    .topbar-right a{font-size:12px;padding:5px 8px}
     .hero-section,.main{padding-left:14px;padding-right:14px}
     .proposal-head{flex-direction:column;gap:12px;text-align:left}
     .ph-right{text-align:left}
-    .slide{min-width:240px;max-width:240px}
+    .slide{min-width:220px;max-width:220px}
     .container{padding:14px}
     input,select,textarea{font-size:16px!important}
-    .row,.row2{grid-template-columns:1fr!important}
+    .row,.row2,.row3{grid-template-columns:1fr!important}
     .btn{padding:12px 20px}
+    .sections-grid{grid-template-columns:1fr!important}
 }
 </style>
 </head>
