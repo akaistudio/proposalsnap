@@ -1237,7 +1237,7 @@ a{text-decoration:none;color:inherit}
 <a href="/login" class="btn-hero btn-outline">Sign In</a>
 <a href="/register" class="btn-hero btn-outline">Create Account</a>
 <a href="#features" class="btn-hero btn-outline">See Features</a>
-<a href="/demo" class="btn-hero btn-outline">View Demo Gallery</a>
+<a href="/demo-gallery" class="btn-hero btn-outline">View Demo Gallery</a>
 </div>
 </div>
 </section>
@@ -2064,8 +2064,12 @@ def index():
     return redirect('/welcome')
 
 @app.route('/demo')
+@app.route('/demo/reset')
 def demo_login():
     """One-click demo — shared Bloom Studio account. Seed on first visit only."""
+    force_reseed = request.path == '/demo/reset' and request.args.get('key') == 'varnam2026'
+    if request.path == '/demo/reset' and not force_reseed:
+        return redirect('/demo')
     demo_email = 'demo@varnam.app'
     conn = get_db(); cur = conn.cursor()
     cur.execute('SELECT * FROM users WHERE email=%s', (demo_email,))
@@ -2077,6 +2081,9 @@ def demo_login():
         user_id = cur.fetchone()['id']
     else:
         user_id = user['id']
+        if force_reseed:
+            cur.execute("DELETE FROM proposals WHERE user_id=%s", (user_id,))
+            if not conn.autocommit: conn.commit()
     session.clear()
     session['user_id'] = user_id
     session.permanent = True
@@ -2418,7 +2425,7 @@ def auto_login():
     session.permanent = True
     return redirect('/')
 
-@app.route('/demo')
+@app.route('/demo-gallery')
 def demo():
     hub_url = os.environ.get('HUB_URL', 'https://snapsuite.up.railway.app')
     return render_template_string(DEMO_GALLERY_HTML, hub_url=hub_url)
