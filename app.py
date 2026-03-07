@@ -2611,11 +2611,15 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 
 /* Responsive */
 @media(max-width:768px){
-    .topbar{padding:12px 16px}
-    .hero-section,.main{padding-left:16px;padding-right:16px}
-    .proposal-head{flex-direction:column;gap:16px;text-align:left}
+    .topbar{padding:10px 14px;flex-wrap:wrap;gap:6px}
+    .hero-section,.main{padding-left:14px;padding-right:14px}
+    .proposal-head{flex-direction:column;gap:12px;text-align:left}
     .ph-right{text-align:left}
-    .slide{min-width:260px;max-width:260px}
+    .slide{min-width:240px;max-width:240px}
+    .container{padding:14px}
+    input,select,textarea{font-size:16px!important}
+    .row,.row2{grid-template-columns:1fr!important}
+    .btn{padding:12px 20px}
 }
 </style>
 </head>
