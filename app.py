@@ -2325,7 +2325,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .stat .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin-bottom:6px}
 .stat .value{font-size:28px;font-weight:800;color:#fff}
 .stat .sub{font-size:12px;color:var(--text2);margin-top:4px}
-.section{margin-bottom:32px}
+.section{margin-bottom:32px;overflow-x:auto}
 .section h2{font-size:16px;font-weight:700;color:#fff;margin-bottom:14px}
 .tbl{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
 .tbl th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text2);padding:12px 16px;text-align:left;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
@@ -2335,7 +2335,17 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .badge-admin{background:rgba(167,139,250,.15);color:var(--accent2)}
 .badge-new{background:rgba(0,210,160,.15);color:var(--green)}
 .empty{text-align:center;padding:40px;color:var(--text2);font-size:14px}
-@media(max-width:600px){.stats{grid-template-columns:1fr 1fr}.tbl{font-size:12px}.tbl th,.tbl td{padding:8px 10px}}
+@media(max-width:768px){
+  .wrap{padding:14px}
+  .hdr{flex-direction:column;align-items:flex-start;gap:8px}
+  .hdr-links{flex-wrap:wrap;gap:4px}
+  .hdr-links a{font-size:12px;padding:6px 10px;margin-left:0}
+  .stats{grid-template-columns:1fr 1fr}
+  .section-wrap{overflow-x:auto}
+  .tbl{font-size:12px;min-width:500px}
+  .tbl th,.tbl td{padding:8px 10px}
+}
+@media(max-width:480px){.stats{grid-template-columns:1fr}}
 </style></head>
 <body>
 <div class="wrap">
