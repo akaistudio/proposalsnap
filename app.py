@@ -1356,7 +1356,7 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 {% endif %}
 <div class="container">
 <div class="app-topbar">
-<a href="/" style="text-decoration:none;color:inherit"><h1 class="app-logo">Proposal<span>Snap</span></h1></a>
+<a href="/welcome" style="text-decoration:none;color:inherit"><h1 class="app-logo">Proposal<span>Snap</span></h1></a>
 <a href="{{ hub_url }}" style="font-size:12px;color:#8B95B0;text-decoration:none;padding:6px 12px;border:1px solid #2A3148;border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">← Varnam Suite</a>
 <a href="/logout" style="font-size:12px;color:#FF6B6B;text-decoration:none;padding:6px 12px;border:1px solid rgba(255,107,107,.3);border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">Sign Out</a>
 {% if is_admin %}<a href="/admin" style="font-size:12px;color:#A78BFA;text-decoration:none;padding:6px 12px;border:1px solid rgba(167,139,250,.3);border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">Admin</a>{% endif %}
