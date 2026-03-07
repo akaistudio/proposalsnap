@@ -1290,6 +1290,9 @@ MAIN_HTML = """<!DOCTYPE html>
 --radius:14px;--font:'Inter',sans-serif}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+.app-topbar{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+.app-logo{font-size:22px;font-weight:800;color:#fff;margin:0}
+.app-logo span{color:var(--accent)}
 .container{max-width:900px;margin:0 auto;padding:24px 16px}
 h1{font-size:32px;font-weight:700;background:linear-gradient(135deg,#6C5CE7,#00D2A0);
 -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
@@ -1351,8 +1354,8 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 </div>
 {% endif %}
 <div class="container">
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-<a href="/" style="text-decoration:none;color:inherit"><h1>ProposalSnap</h1></a>
+<div class="app-topbar">
+<a href="/" style="text-decoration:none;color:inherit"><h1 class="app-logo">Proposal<span>Snap</span></h1></a>
 <a href="{{ hub_url }}" style="font-size:12px;color:#8B95B0;text-decoration:none;padding:6px 12px;border:1px solid #2A3148;border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">← Varnam Suite</a>
 <a href="/logout" style="font-size:12px;color:#FF6B6B;text-decoration:none;padding:6px 12px;border:1px solid rgba(255,107,107,.3);border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">Sign Out</a>
 {% if is_admin %}<a href="/admin" style="font-size:12px;color:#A78BFA;text-decoration:none;padding:6px 12px;border:1px solid rgba(167,139,250,.3);border-radius:6px;font-weight:600;font-family:'DM Sans',sans-serif">Admin</a>{% endif %}
@@ -2621,14 +2624,18 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 
 /* Responsive */
 @media(max-width:768px){
+    body{overflow-x:hidden}
     .topbar{padding:10px 14px;flex-wrap:wrap;gap:6px}
     .topbar-right{flex-wrap:wrap;gap:4px}
     .topbar-right a{font-size:12px;padding:5px 8px}
+    .app-topbar{flex-wrap:wrap;gap:6px;padding:10px 14px;margin-bottom:6px}
+    .app-logo{font-size:18px!important}
+    .app-topbar a{font-size:11px!important;padding:5px 8px!important}
     .hero-section,.main{padding-left:14px;padding-right:14px}
     .proposal-head{flex-direction:column;gap:12px;text-align:left}
     .ph-right{text-align:left}
     .slide{min-width:220px;max-width:220px}
-    .container{padding:14px}
+    .container{padding:14px;overflow-x:hidden}
     input,select,textarea{font-size:16px!important}
     .row,.row2,.row3{grid-template-columns:1fr!important}
     .btn{padding:12px 20px}
