@@ -1341,6 +1341,15 @@ border-radius:20px;cursor:pointer;border:1px solid transparent;transition:all 0.
 </style>
 </head>
 <body>
+{% if is_demo %}
+<div style="background:linear-gradient(135deg,#7c3aed,#4f46e5);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;font-weight:600;color:#fff;position:sticky;top:0;z-index:200;flex-wrap:wrap">
+  <span>🎭 Demo mode — Bloom Studio &nbsp;·&nbsp; <span style="font-weight:400;opacity:.85">Explore freely, nothing is saved permanently</span></span>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <a href="/demo/reset?key=varnam2026" style="padding:6px 14px;background:rgba(255,255,255,0.15);color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700">↺ Reset Demo</a>
+    <a href="/register" style="padding:6px 14px;background:#fff;color:#4f46e5;border-radius:6px;text-decoration:none;font-size:12px;font-weight:700">Create Account →</a>
+  </div>
+</div>
+{% endif %}
 <div class="container">
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
 <a href="/" style="text-decoration:none;color:inherit"><h1>ProposalSnap</h1></a>
@@ -2248,7 +2257,11 @@ def create():
             conn.close()
     except: pass
     hub_url = os.environ.get('FINANCESNAP_URL', 'https://snapsuite.up.railway.app')
-    return render_template_string(MAIN_HTML, is_admin=is_admin, hub_url=hub_url)
+    conn2 = get_db(); cur2 = conn2.cursor()
+    cur2.execute('SELECT email FROM users WHERE id=%s', (session.get('user_id'),))
+    u2 = cur2.fetchone(); conn2.close()
+    is_demo = (u2 and u2.get('email') == 'demo@varnam.app')
+    return render_template_string(MAIN_HTML, is_admin=is_admin, hub_url=hub_url, is_demo=is_demo)
 
 @app.route('/admin')
 @login_required
